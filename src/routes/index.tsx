@@ -36,41 +36,45 @@ function Index() {
   return (
     <>
       <section className="hero">
-        <img
-          className="hero-art"
-          src={art}
-          alt="Cute illustrated Indian warrior, philosopher, and scientist"
-          width={1536}
-          height={1024}
-        />
-        <div className="wrap hero-content">
-          <div className="eyebrow">
-            <Compass size={14} /> A LITTLE MYSTERY. A LOT OF HERSTORY.
+        <div className="wrap hero-wrap">
+          <div className="hero-content">
+            <div className="eyebrow">
+              <Compass size={14} /> A LITTLE MYSTERY. A LOT OF HERSTORY.
+            </div>
+            <h1>
+              Unsung Heroines
+              <br />
+              of <span>India.</span>
+            </h1>
+            <p>
+              Some stories deserve a little more spotlight.
+              <br />
+              Follow the clues. Find her name. Celebrate the women who changed our world.
+            </p>
+            <div className="hero-actions">
+              <Button size="lg" asChild>
+                <Link to="/challenge">
+                  Join the hunt <ArrowRight />
+                </Link>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link to="/heroines">
+                  Meet the heroines <BookOpen />
+                </Link>
+              </Button>
+            </div>
+            <div className="hero-date">
+              <CalendarDays size={15} /> October 11–20, 2026 <span>•</span> 10 days of discovery
+            </div>
           </div>
-          <h1>
-            Unsung Heroines
-            <br />
-            of <span>India.</span>
-          </h1>
-          <p>
-            Some stories deserve a little more spotlight.
-            <br />
-            Follow the clues. Find her name. Celebrate the women who changed our world.
-          </p>
-          <div className="hero-actions">
-            <Button size="lg" asChild>
-              <Link to="/challenge">
-                Join the hunt <ArrowRight />
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link to="/heroines">
-                Meet the heroines <BookOpen />
-              </Link>
-            </Button>
-          </div>
-          <div className="hero-date">
-            <CalendarDays size={15} /> October 11–20, 2026 <span>•</span> 10 days of discovery
+          <div className="hero-art-box">
+            <img
+              className="hero-art"
+              src={art}
+              alt="Cute illustrated Indian warrior, philosopher, and scientist"
+              width={1536}
+              height={1024}
+            />
           </div>
         </div>
       </section>
