@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { ArrowRight, CalendarDays, Compass, ScrollText, LockKeyhole, Trophy, BookOpen, Crown, MoveUpRight } from 'lucide-react';
+import { ArrowRight, CalendarDays, Sparkles, LockKeyhole, Trophy, BookOpen, Heart, Crown, MoveUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DiyaIcon } from '@/components/diya-icon';
 import art from '@/assets/heroines-cute.jpg';
 import { getLiveDays } from '@/lib/admin-store';
 import { DAILY_QUIZZES } from '@/data/quiz';
@@ -10,9 +9,9 @@ import { DAILY_QUIZZES } from '@/data/quiz';
 export const Route = createFileRoute('/')({
   head: () => ({
     meta: [
-      { title: 'पहचानो कौन? — Unsung Heroines of India' },
+      { title: 'पहचान कौन? — Unsung Heroines of India' },
       { name: 'description', content: 'A daily puzzle hunt celebrating the extraordinary women of India. October 11–20.' },
-      { property: 'og:title', content: 'पहचानो कौन? — Unsung Heroines of India' },
+      { property: 'og:title', content: 'पहचान कौन? — Unsung Heroines of India' },
       { property: 'og:description', content: 'Ten days. Extraordinary women. Discover the stories history forgot.' },
       { property: 'og:type', content: 'website' },
       { name: 'twitter:card', content: 'summary_large_image' },
@@ -45,7 +44,7 @@ function Index() {
         />
         <div className="wrap hero-content">
           <div className="eyebrow">
-            <Compass size={14} /> A LITTLE MYSTERY. A LOT OF HERSTORY.
+            <Sparkles size={14} /> A LITTLE MYSTERY. A LOT OF HERSTORY.
           </div>
           <h1>
             Unsung Heroines
@@ -78,8 +77,8 @@ function Index() {
       <div className="wrap">
         <div className="stats">
           {[
-            [BookOpen, '65+ incredible heroines', 'Across three historical eras'],
-            [ScrollText, 'A new mystery, daily', 'Three women. Three clues.'],
+            [BookOpen, '27 incredible heroines', 'Across three historical eras'],
+            [Sparkles, 'A new mystery, daily', 'Three women. Three clues.'],
             [Trophy, 'One grand finale', 'Your biggest challenge yet'],
           ].map(([Icon, title, sub]) => {
             const I = Icon as typeof BookOpen;
@@ -110,15 +109,15 @@ function Index() {
           </div>
 
           <div className="days">
-            {DAILY_QUIZZES.map((quiz, idx) => {
+            {DAILY_QUIZZES.map((quiz, i) => {
               const dayNum = quiz.day;
               const isLive = liveDays.includes(dayNum);
-              const isFinale = idx === 9;
+              const isFinale = i === 9;
 
               return (
                 <article
                   key={dayNum}
-                  className={`day ${isLive ? 'featured' : ''} ${isFinale ? 'finale' : ''}`}
+                  className={`day ${isLive ? 'featured' : ''} ${isFinale && !isLive ? 'finale' : ''}`}
                 >
                   <small>DAY {String(dayNum).padStart(2, '0')}</small>
                   {isLive && <span className="tag">PLAY NOW</span>}
@@ -128,7 +127,7 @@ function Index() {
                     {isFinale && !isLive ? (
                       <Crown size={20} />
                     ) : isLive ? (
-                      <DiyaIcon size={20} />
+                      <Sparkles size={20} />
                     ) : (
                       <LockKeyhole size={17} />
                     )}
@@ -136,7 +135,7 @@ function Index() {
 
                   <h3>
                     {isLive
-                      ? `Day ${String(dayNum).padStart(2, '0')}: ${quiz.title}`
+                      ? (dayNum === 1 ? 'Today’s hunt' : quiz.title)
                       : isFinale
                       ? 'The Grand Finale'
                       : 'A mystery awaits…'}
@@ -144,8 +143,8 @@ function Index() {
 
                   <p>
                     {isLive
-                      ? `Open now · 3 clues · 30 points`
-                      : `Unlocks ${quiz.date}${isFinale ? ' · 10 questions' : ''}`}
+                      ? 'Open now · 3 clues · 30 sparkles'
+                      : `Unlocks October ${11 + i}${isFinale ? ' · 10 questions' : ''}`}
                   </p>
 
                   {isLive && (
@@ -174,11 +173,12 @@ function Index() {
         </section>
 
         <footer className="footer">
-          <span>पहचानो कौन? · Celebrating the extraordinary.</span>
-          <span>Inspired by our amazing girl ambassadors. Thank you for this beautiful idea.</span>
+          <span>पहचान कौन? · Celebrating the extraordinary.</span>
+          <span>
+            Made with <Heart size={12} className="inline text-primary" /> for the stories that matter.
+          </span>
         </footer>
       </div>
     </>
   );
 }
-
