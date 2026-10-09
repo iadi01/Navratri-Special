@@ -11,12 +11,12 @@ type StoredAdmin = AdminUser & {
   passwordHash: string;
 };
 
-const ADMINS_STORAGE_KEY = 'pehchaan_admins_v1';
-const SESSION_STORAGE_KEY = 'pehchaan_admin_session_v1';
+const ADMINS_STORAGE_KEY = 'pehchaan_admins_v2';
+const SESSION_STORAGE_KEY = 'pehchaan_admin_session_v2';
 
 // Seed default main admin using secure env fallbacks
-const DEFAULT_MAIN_ADMIN_USERNAME = (typeof process !== 'undefined' && process.env?.MAIN_ADMIN_USERNAME) || 'mainadmin';
-const DEFAULT_MAIN_ADMIN_PASSWORD = (typeof process !== 'undefined' && process.env?.MAIN_ADMIN_PASSWORD) || 'admin123';
+const DEFAULT_MAIN_ADMIN_USERNAME = (typeof process !== 'undefined' && process.env?.MAIN_ADMIN_USERNAME) || 'kuchupuchu';
+const DEFAULT_MAIN_ADMIN_PASSWORD = (typeof process !== 'undefined' && process.env?.MAIN_ADMIN_PASSWORD) || 'mybestfriendnilay420';
 
 const DEFAULT_MAIN_ADMIN: StoredAdmin = {
   username: DEFAULT_MAIN_ADMIN_USERNAME,

@@ -242,11 +242,6 @@ function AdminPage() {
               <KeyRound size={16} className="mr-2" /> Sign In to Admin Panel
             </Button>
           </form>
-
-          <div className="mt-6 pt-4 border-t border-border/60 text-xs text-muted-foreground space-y-1 text-center">
-            <p className="font-semibold text-foreground/80">Default Main Admin Credentials:</p>
-            <p>Username: <code className="bg-muted px-1.5 py-0.5 rounded font-mono">mainadmin</code> &nbsp;|&nbsp; Password: <code className="bg-muted px-1.5 py-0.5 rounded font-mono">admin123</code></p>
-          </div>
         </div>
       </main>
     );
