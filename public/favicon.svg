@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="16" fill="#991b1b"/>
+  <circle cx="32" cy="32" r="26" fill="#b91c1c" opacity="0.6"/>
+  <!-- Diya / Lotus Bloom of Courage & Wisdom -->
+  <path d="M32 12C32 12 40 23 40 33C40 38.5 36.4 43 32 43C27.6 43 24 38.5 24 33C24 23 32 12 32 12Z" fill="#facc15"/>
+  <path d="M32 20C32 20 37 27.5 37 34C37 37.5 34.8 40.5 32 40.5C29.2 40.5 27 37.5 27 34C27 27.5 32 20 32 20Z" fill="#fef08a"/>
+  <path d="M21 27C23.5 32.5 26.5 38 32 42.5C25.5 42 18 38 17 30.5C16.5 27 19.5 25.5 21 27Z" fill="#f59e0b"/>
+  <path d="M43 27C40.5 32.5 37.5 38 32 42.5C38.5 42 46 38 47 30.5C47.5 27 44.5 25.5 43 27Z" fill="#f59e0b"/>
+  <circle cx="32" cy="33" r="3.5" fill="#ffffff"/>
+  <path d="M15 45C23 51.5 41 51.5 49 45C45.5 49.5 39 52 32 52C25 52 18.5 49.5 15 45Z" fill="#fef08a"/>
+</svg>
