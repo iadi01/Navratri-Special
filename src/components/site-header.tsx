@@ -42,7 +42,7 @@ export function SiteHeader() {
           <Flower2 size={24} />
         </span>
         <span>
-          पहचान कौन?
+          पहचानो कौन?
           <small>UNSUNG HEROINES OF INDIA</small>
         </span>
       </Link>
