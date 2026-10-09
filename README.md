@@ -1,29 +1,47 @@
 # Navratri-Special — पहचानो कौन?
 
-Interactive 10-day celebration of India's Unsung Heroines (Ancient, Medieval, and Modern eras) with daily clue-based mystery hunts, real-time leaderboard, and student directory.
+An interactive 10-day cultural and educational mystery hunt celebrating the **Unsung Heroines of India** across Ancient, Medieval, and Modern eras.
 
-## Build with Lovable
+## 🌟 Highlights
+- **Daily Mystery Clues:** Three clues for each heroine with points calculated based on speed and first-try accuracy.
+- **Interactive Leaderboard:** Overall and day-wise standings with high-precision time and points tracking.
+- **MongoDB Atlas Backend:** Real-time persistence for scores, participants, and leaderboard records.
+- **Admin Control Center:** Manage live daily chapters, inspect clues, and view student directory.
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+## 🚀 Getting Started
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+### Prerequisites
+- Node.js (v20+ or v22)
+- MongoDB Atlas cluster or local MongoDB instance
 
-## Development
+### Installation
+```bash
+# Clone the repository
+git clone https://github.com/iadi01/Navratri-Special.git
+cd Navratri-Special
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+# Install dependencies
+npm install
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+# Setup environment variables
+cp .env.example .env
+
+# Run development server
 npm run dev
 ```
 
-## Built with
+### Build for Production
+```bash
+npm run build
+npm run preview
+```
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+## 🛠️ Tech Stack
+- **Framework:** TanStack Start / Vite
+- **UI & Styling:** React 19, Tailwind CSS
+- **Database:** MongoDB Atlas Driver
+- **Language:** TypeScript
+- **Testing:** Vitest
+
+## 📜 License
+MIT License. Dedicated to celebrating India's extraordinary heroines.
