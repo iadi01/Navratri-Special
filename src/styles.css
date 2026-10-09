@@ -128,37 +128,44 @@ button, a {
   position: relative;
   background: var(--hero);
   overflow: hidden;
+  min-height: 520px;
 }
 
 .hero-wrap {
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  align-items: center;
   position: relative;
   min-height: 520px;
-  gap: 24px;
+  display: flex;
+  align-items: center;
 }
 
 .hero-content {
   position: relative;
-  z-index: 1;
-  padding: 48px 0;
+  z-index: 2;
+  padding: 50px 0;
+  max-width: 560px;
   text-align: left;
 }
 
 .hero-art-box {
+  position: absolute;
+  right: -20px;
+  top: 0;
+  bottom: 0;
+  width: 60%;
+  max-width: 720px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .hero-art {
   width: 100%;
-  max-width: 520px;
-  height: auto;
-  max-height: 470px;
+  height: 100%;
+  max-height: 520px;
   object-fit: contain;
+  object-position: right center;
 }
 
 .eyebrow {
@@ -212,7 +219,7 @@ button, a {
 .hero p {
   font-size: 15px;
   line-height: 1.8;
-  max-width: 400px;
+  max-width: 380px;
   color: var(--muted-foreground);
 }
 
@@ -852,24 +859,36 @@ button, a {
   }
 
   .hero-wrap {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     min-height: auto;
     padding-bottom: 24px;
-    gap: 16px;
+    align-items: flex-start;
   }
 
   .hero-content {
     padding-top: 24px;
     padding-bottom: 0;
+    max-width: 100%;
   }
 
   .hero-art-box {
+    position: relative;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    margin-top: 16px;
     justify-content: center;
   }
 
   .hero-art {
-    max-width: 100%;
-    max-height: 320px;
+    width: 100%;
+    max-width: 480px;
+    height: auto;
+    max-height: 340px;
+    object-position: center;
   }
 
   .hero h1 {
