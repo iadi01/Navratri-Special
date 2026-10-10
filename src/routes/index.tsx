@@ -4,7 +4,7 @@ import { ArrowRight, CalendarDays, Compass, ScrollText, LockKeyhole, Trophy, Boo
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
 import art from '@/assets/heroines-cute.jpg';
-import { getLiveDays } from '@/lib/admin-store';
+import { getLiveDays, syncLiveDaysWithServer } from '@/lib/admin-store';
 import { DAILY_QUIZZES } from '@/data/quiz';
 
 export const Route = createFileRoute('/')({
@@ -26,6 +26,7 @@ function Index() {
 
   useEffect(() => {
     setLiveDays(getLiveDays());
+    syncLiveDaysWithServer().then(days => setLiveDays(days));
     const handleUpdate = () => {
       setLiveDays(getLiveDays());
     };

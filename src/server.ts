@@ -3,7 +3,18 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { saveScoreToMongo, getScoresFromMongo, getUsersFromMongo, getMongoStatus } from "./server/db-service";
+import {
+  saveScoreToMongo,
+  getScoresFromMongo,
+  getUsersFromMongo,
+  getMongoStatus,
+  validateAdminLogin,
+  getAdminsFromMongo,
+  saveAdminToMongo,
+  deleteAdminFromMongo,
+  getLiveDaysFromMongo,
+  saveLiveDaysToMongo,
+} from "./server/db-service";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -109,6 +120,105 @@ export default {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
+    }
+
+    // =========================================================================
+    // 👑 ADMIN & GLOBAL CONFIG API HANDLERS
+    // =========================================================================
+    if (url.pathname === '/api/admin/login' && request.method === 'POST') {
+      try {
+        const { username, password } = await request.json();
+        const res = await validateAdminLogin(username, password);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 401,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message || 'Login failed' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    if (url.pathname === '/api/admin/list' && request.method === 'GET') {
+      try {
+        const admins = await getAdminsFromMongo();
+        return new Response(JSON.stringify(admins), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify([]), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    if (url.pathname === '/api/admin/add' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const res = await saveAdminToMongo(body);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message || 'Failed to add admin' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    if (url.pathname === '/api/admin/delete' && request.method === 'POST') {
+      try {
+        const { username } = await request.json();
+        const res = await deleteAdminFromMongo(username);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message || 'Failed to delete admin' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    if (url.pathname === '/api/admin/live-days') {
+      if (request.method === 'GET') {
+        try {
+          const days = await getLiveDaysFromMongo();
+          return new Response(JSON.stringify(days), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify([1]), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
+
+      if (request.method === 'POST') {
+        try {
+          const { days } = await request.json();
+          const ok = await saveLiveDaysToMongo(days);
+          return new Response(JSON.stringify({ success: ok }), {
+            status: ok ? 200 : 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ success: false, error: err?.message }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
     }
 
     // SSR and TanStack Router Pages

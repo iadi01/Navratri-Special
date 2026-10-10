@@ -25,7 +25,7 @@ import {
   getQuizForDay,
   pointsFor,
 } from '@/data/quiz';
-import { getLiveDays } from '@/lib/admin-store';
+import { getLiveDays, syncLiveDaysWithServer } from '@/lib/admin-store';
 import {
   submitLeaderboardScore,
   getSavedUserProfile,
@@ -65,7 +65,14 @@ function readBestForDay(day: number): number {
 
 function Quiz() {
   const search = useSearch({ from: '/challenge' });
-  const liveDays = useMemo(() => getLiveDays(), []);
+  const [liveDays, setLiveDays] = useState<number[]>(() => getLiveDays());
+
+  useEffect(() => {
+    syncLiveDaysWithServer().then(days => setLiveDays(days));
+    const handleUpdate = () => setLiveDays(getLiveDays());
+    window.addEventListener('pehchaan_live_days_changed', handleUpdate);
+    return () => window.removeEventListener('pehchaan_live_days_changed', handleUpdate);
+  }, []);
 
   const targetDay = search.day || liveDays[0] || 1;
   const currentQuiz = useMemo(() => getQuizForDay(targetDay), [targetDay]);

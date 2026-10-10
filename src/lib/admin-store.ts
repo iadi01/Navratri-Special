@@ -13,10 +13,11 @@ type StoredAdmin = AdminUser & {
 
 const ADMINS_STORAGE_KEY = 'pehchaan_admins_v2';
 const SESSION_STORAGE_KEY = 'pehchaan_admin_session_v2';
+const LIVE_DAYS_STORAGE_KEY = 'pehchaan_live_days_v2';
 
-// Seed default main admin using secure env fallbacks
-const DEFAULT_MAIN_ADMIN_USERNAME = (typeof process !== 'undefined' && process.env?.MAIN_ADMIN_USERNAME) || 'kuchupuchu';
-const DEFAULT_MAIN_ADMIN_PASSWORD = (typeof process !== 'undefined' && process.env?.MAIN_ADMIN_PASSWORD) || 'mybestfriendnilay420';
+// Default fallback main admin credentials
+const DEFAULT_MAIN_ADMIN_USERNAME = 'kuchupuchu';
+const DEFAULT_MAIN_ADMIN_PASSWORD = 'mybestfriendnilay420';
 
 const DEFAULT_MAIN_ADMIN: StoredAdmin = {
   username: DEFAULT_MAIN_ADMIN_USERNAME,
@@ -71,30 +72,72 @@ export function getAdminSession(): { isAuthenticated: boolean; user: AdminUser |
   }
 }
 
-export function loginAdmin(username: string, password: string): { success: boolean; user?: AdminUser; error?: string } {
-  const admins = readStoredAdmins();
-  const trimmedUser = username.trim().toLowerCase();
-  const found = admins.find(a => a.username.toLowerCase() === trimmedUser);
+export async function loginAdmin(
+  username: string,
+  password: string
+): Promise<{ success: boolean; user?: AdminUser; error?: string }> {
+  const cleanUser = (username || '').trim();
+  const cleanPass = (password || '').trim();
 
-  if (!found || found.passwordHash !== password) {
-    return { success: false, error: 'Invalid username or password' };
+  if (!cleanUser || !cleanPass) {
+    return { success: false, error: 'Please enter both username and password.' };
   }
 
-  const userSafe: AdminUser = {
-    username: found.username,
-    name: found.name,
-    role: found.role,
-    createdAt: found.createdAt,
-  };
-
+  // 1. Try authenticating via the Server API (MongoDB Atlas)
   try {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userSafe));
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userSafe));
-  } catch {
-    /* ignore storage errors */
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (res.ok && data?.success && data?.user) {
+      const userSafe: AdminUser = data.user;
+      try {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userSafe));
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userSafe));
+      } catch {
+        /* ignore storage write errors */
+      }
+      return { success: true, user: userSafe };
+    }
+
+    if (data && data.error && !res.ok) {
+      return { success: false, error: data.error };
+    }
+  } catch (netErr) {
+    console.warn('Network issue reaching /api/admin/login, attempting local fallback:', netErr);
   }
 
-  return { success: true, user: userSafe };
+  // 2. Offline fallback (or direct check against default/local admin)
+  const admins = readStoredAdmins();
+  const found = admins.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
+
+  if (
+    found &&
+    (found.passwordHash === cleanPass ||
+      (cleanUser.toLowerCase() === DEFAULT_MAIN_ADMIN_USERNAME.toLowerCase() && cleanPass === DEFAULT_MAIN_ADMIN_PASSWORD))
+  ) {
+    const userSafe: AdminUser = {
+      username: found.username,
+      name: found.name,
+      role: found.role,
+      createdAt: found.createdAt,
+    };
+
+    try {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userSafe));
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userSafe));
+    } catch {
+      /* ignore */
+    }
+
+    return { success: true, user: userSafe };
+  }
+
+  return { success: false, error: 'Invalid username or password' };
 }
 
 export function logoutAdmin() {
@@ -112,42 +155,91 @@ export function getAllAdmins(): AdminUser[] {
   return admins.map(({ passwordHash: _hash, ...user }) => user);
 }
 
-export function addAdmin(
+export async function syncAdminsFromServer(): Promise<AdminUser[]> {
+  if (typeof window === 'undefined') return getAllAdmins();
+  try {
+    const res = await fetch('/api/admin/list');
+    if (res.ok) {
+      const serverAdmins = await res.json();
+      if (Array.isArray(serverAdmins) && serverAdmins.length > 0) {
+        const existing = readStoredAdmins();
+        const merged: StoredAdmin[] = serverAdmins.map((sa: AdminUser) => {
+          const found = existing.find(e => e.username.toLowerCase() === sa.username.toLowerCase());
+          return {
+            username: sa.username,
+            name: sa.name,
+            role: sa.role,
+            createdAt: sa.createdAt,
+            passwordHash: found?.passwordHash || '',
+          };
+        });
+        writeStoredAdmins(merged);
+        return serverAdmins;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to sync admins from server:', err);
+  }
+  return getAllAdmins();
+}
+
+export async function addAdmin(
   currentUser: AdminUser,
   newAdmin: { username: string; name: string; password: string; role: AdminRole }
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   // STRICT RULE: Only Main Admin can add new admins
   if (currentUser.role !== 'main_admin') {
     return { success: false, error: 'Permission denied: Only Main Admin can add other administrators.' };
   }
 
   const trimmedUsername = newAdmin.username.trim().toLowerCase();
+  const trimmedPassword = newAdmin.password.trim();
+
   if (!trimmedUsername || trimmedUsername.length < 3) {
     return { success: false, error: 'Username must be at least 3 characters long.' };
   }
-  if (!newAdmin.password || newAdmin.password.length < 4) {
+  if (!trimmedPassword || trimmedPassword.length < 4) {
     return { success: false, error: 'Password must be at least 4 characters.' };
   }
 
-  const admins = readStoredAdmins();
-  if (admins.some(a => a.username.toLowerCase() === trimmedUsername)) {
-    return { success: false, error: 'An admin with this username already exists.' };
+  // 1. Save to MongoDB Atlas via server API
+  try {
+    const res = await fetch('/api/admin/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        username: trimmedUsername,
+        name: newAdmin.name.trim() || trimmedUsername,
+        password: trimmedPassword,
+        role: newAdmin.role || 'admin',
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || (data && !data.success)) {
+      return { success: false, error: data?.error || 'Failed to save admin on server' };
+    }
+  } catch (err: any) {
+    console.warn('Could not reach server to save admin, caching locally:', err?.message);
   }
 
-  const newEntry: StoredAdmin = {
-    username: trimmedUsername,
-    name: newAdmin.name.trim() || trimmedUsername,
-    role: newAdmin.role || 'admin',
-    passwordHash: newAdmin.password,
-    createdAt: new Date().toISOString(),
-  };
+  // 2. Cache in local storage
+  const admins = readStoredAdmins();
+  if (!admins.some(a => a.username.toLowerCase() === trimmedUsername)) {
+    const newEntry: StoredAdmin = {
+      username: trimmedUsername,
+      name: newAdmin.name.trim() || trimmedUsername,
+      role: newAdmin.role || 'admin',
+      passwordHash: trimmedPassword,
+      createdAt: new Date().toISOString(),
+    };
+    admins.push(newEntry);
+    writeStoredAdmins(admins);
+  }
 
-  admins.push(newEntry);
-  writeStoredAdmins(admins);
   return { success: true };
 }
 
-export function deleteAdmin(currentUser: AdminUser, usernameToDelete: string): { success: boolean; error?: string } {
+export async function deleteAdmin(currentUser: AdminUser, usernameToDelete: string): Promise<{ success: boolean; error?: string }> {
   // STRICT RULE: Only Main Admin can remove admins
   if (currentUser.role !== 'main_admin') {
     return { success: false, error: 'Permission denied: Only Main Admin can delete administrators.' };
@@ -157,15 +249,25 @@ export function deleteAdmin(currentUser: AdminUser, usernameToDelete: string): {
     return { success: false, error: 'Cannot delete your own active Main Admin account.' };
   }
 
+  // 1. Delete from MongoDB Atlas via server API
+  try {
+    await fetch('/api/admin/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: usernameToDelete.trim().toLowerCase() }),
+    });
+  } catch (err: any) {
+    console.warn('Failed to delete admin on server:', err?.message);
+  }
+
+  // 2. Remove from local storage
   const admins = readStoredAdmins();
   const updated = admins.filter(a => a.username.toLowerCase() !== usernameToDelete.toLowerCase());
   writeStoredAdmins(updated);
   return { success: true };
 }
 
-const LIVE_DAYS_STORAGE_KEY = 'pehchaan_live_days_v2';
-
-// Live days management (default empty [] so all days are locked until 11th or unlocked by admin)
+// Live days management
 export function getLiveDays(): number[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -183,12 +285,31 @@ export function getLiveDays(): number[] {
   }
 }
 
+export async function syncLiveDaysWithServer(): Promise<number[]> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const res = await fetch('/api/admin/live-days');
+    if (res.ok) {
+      const days = await res.json();
+      if (Array.isArray(days)) {
+        const sorted = days.map(Number).sort((a, b) => a - b);
+        localStorage.setItem(LIVE_DAYS_STORAGE_KEY, JSON.stringify(sorted));
+        window.dispatchEvent(new Event('pehchaan_live_days_changed'));
+        return sorted;
+      }
+    }
+  } catch (err) {
+    /* offline fallback */
+  }
+  return getLiveDays();
+}
+
 export function isDayLive(day: number): boolean {
   const live = getLiveDays();
   return live.includes(day);
 }
 
-export function toggleDayLive(day: number): number[] {
+export async function toggleDayLive(day: number): Promise<number[]> {
   const live = new Set(getLiveDays());
   if (live.has(day)) {
     live.delete(day);
@@ -199,13 +320,19 @@ export function toggleDayLive(day: number): number[] {
   try {
     localStorage.setItem(LIVE_DAYS_STORAGE_KEY, JSON.stringify(result));
     window.dispatchEvent(new Event('pehchaan_live_days_changed'));
+    // Persist globally to MongoDB
+    fetch('/api/admin/live-days', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ days: result }),
+    }).catch(err => console.warn('Could not sync live days to server:', err));
   } catch (err) {
     console.error('Failed to update live days:', err);
   }
   return result;
 }
 
-export function setDayLive(day: number, shouldBeLive: boolean): number[] {
+export async function setDayLive(day: number, shouldBeLive: boolean): Promise<number[]> {
   const live = new Set(getLiveDays());
   if (shouldBeLive) {
     live.add(day);
@@ -216,6 +343,11 @@ export function setDayLive(day: number, shouldBeLive: boolean): number[] {
   try {
     localStorage.setItem(LIVE_DAYS_STORAGE_KEY, JSON.stringify(result));
     window.dispatchEvent(new Event('pehchaan_live_days_changed'));
+    fetch('/api/admin/live-days', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ days: result }),
+    }).catch(() => {});
   } catch (err) {
     console.error('Failed to update live days:', err);
   }

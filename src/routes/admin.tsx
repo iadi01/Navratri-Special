@@ -35,9 +35,11 @@ import {
   loginAdmin,
   logoutAdmin,
   getAllAdmins,
+  syncAdminsFromServer,
   addAdmin,
   deleteAdmin,
   getLiveDays,
+  syncLiveDaysWithServer,
   toggleDayLive,
   type AdminUser,
   type AdminRole,
@@ -72,6 +74,7 @@ function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Live days state
   const [liveDays, setLiveDays] = useState<number[]>([1]);
@@ -98,8 +101,13 @@ function AdminPage() {
     setSession(s);
     setLiveDays(getLiveDays());
     setParticipants(getOverallLeaderboard());
+
+    // Fetch live days from server
+    syncLiveDaysWithServer().then(days => setLiveDays(days));
+
     if (s.isAuthenticated) {
       setAdminList(getAllAdmins());
+      syncAdminsFromServer().then(list => setAdminList(list));
       syncLeaderboardWithServer().then(() => {
         setParticipants(getOverallLeaderboard());
       });
@@ -117,17 +125,25 @@ function AdminPage() {
     };
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-    const res = loginAdmin(usernameInput, passwordInput);
-    if (res.success && res.user) {
-      setSession({ isAuthenticated: true, user: res.user });
-      setAdminList(getAllAdmins());
-      setUsernameInput('');
-      setPasswordInput('');
-    } else {
-      setLoginError(res.error || 'Authentication failed');
+    setIsLoggingIn(true);
+    try {
+      const res = await loginAdmin(usernameInput, passwordInput);
+      if (res.success && res.user) {
+        setSession({ isAuthenticated: true, user: res.user });
+        const list = await syncAdminsFromServer();
+        setAdminList(list);
+        setUsernameInput('');
+        setPasswordInput('');
+      } else {
+        setLoginError(res.error || 'Authentication failed');
+      }
+    } catch (err: any) {
+      setLoginError(err?.message || 'Login failed. Please check network.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -136,17 +152,17 @@ function AdminPage() {
     setSession({ isAuthenticated: false, user: null });
   };
 
-  const handleToggleDay = (day: number) => {
-    const updated = toggleDayLive(day);
+  const handleToggleDay = async (day: number) => {
+    const updated = await toggleDayLive(day);
     setLiveDays(updated);
   };
 
-  const handleAddAdmin = (e: React.FormEvent) => {
+  const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session.user) return;
     setAdminActionMsg(null);
 
-    const res = addAdmin(session.user, {
+    const res = await addAdmin(session.user, {
       username: newUsername,
       name: newName,
       password: newPassword,
@@ -159,20 +175,22 @@ function AdminPage() {
       setNewName('');
       setNewPassword('');
       setNewRole('admin');
-      setAdminList(getAllAdmins());
+      const list = await syncAdminsFromServer();
+      setAdminList(list);
     } else {
       setAdminActionMsg({ type: 'error', text: res.error || 'Failed to create admin' });
     }
   };
 
-  const handleDeleteAdmin = (targetUsername: string) => {
+  const handleDeleteAdmin = async (targetUsername: string) => {
     if (!session.user) return;
     if (!confirm(`Are you sure you want to remove admin @${targetUsername}?`)) return;
 
-    const res = deleteAdmin(session.user, targetUsername);
+    const res = await deleteAdmin(session.user, targetUsername);
     if (res.success) {
       setAdminActionMsg({ type: 'success', text: `Admin @${targetUsername} removed.` });
-      setAdminList(getAllAdmins());
+      const list = await syncAdminsFromServer();
+      setAdminList(list);
     } else {
       setAdminActionMsg({ type: 'error', text: res.error || 'Failed to remove admin' });
     }
@@ -220,7 +238,10 @@ function AdminPage() {
                 id="username"
                 type="text"
                 autoComplete="username"
-                placeholder="Enter admin username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Enter admin username (e.g. kuchupuchu)"
                 value={usernameInput}
                 onChange={e => setUsernameInput(e.target.value)}
                 required
@@ -272,8 +293,9 @@ function AdminPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full mt-2" size="lg">
-              <KeyRound size={16} className="mr-2" /> Sign In to Admin Panel
+            <Button type="submit" className="w-full mt-2" size="lg" disabled={isLoggingIn}>
+              <KeyRound size={16} className="mr-2" />
+              {isLoggingIn ? 'Verifying & Signing In...' : 'Sign In to Admin Panel'}
             </Button>
           </form>
         </div>

@@ -27,7 +27,7 @@ import {
   type OverallLeaderboardEntry,
 } from '@/lib/leaderboard-store';
 import { DAILY_QUIZZES } from '@/data/quiz';
-import { getLiveDays } from '@/lib/admin-store';
+import { getLiveDays, syncLiveDaysWithServer } from '@/lib/admin-store';
 
 const BEST_KEY_PREFIX = 'pehchaan-kaun-best-day-';
 
@@ -55,7 +55,7 @@ export const Route = createFileRoute('/leaderboard')({
 
 function Leaderboard() {
   const search = useSearch({ from: '/leaderboard' });
-  const liveDays = useMemo(() => getLiveDays(), []);
+  const [liveDays, setLiveDays] = useState<number[]>(() => getLiveDays());
 
   const [activeTab, setActiveTab] = useState<'overall' | 'daily'>(
     search.day ? 'daily' : search.view === 'daily' ? 'daily' : 'overall'
@@ -80,12 +80,20 @@ function Leaderboard() {
 
   useEffect(() => {
     loadData();
+    syncLiveDaysWithServer().then(days => setLiveDays(days));
     syncLeaderboardWithServer().then(() => {
       loadData();
     });
-    const handleUpdate = () => loadData();
+    const handleUpdate = () => {
+      setLiveDays(getLiveDays());
+      loadData();
+    };
     window.addEventListener('pehchaan_leaderboard_updated', handleUpdate);
-    return () => window.removeEventListener('pehchaan_leaderboard_updated', handleUpdate);
+    window.addEventListener('pehchaan_live_days_changed', handleUpdate);
+    return () => {
+      window.removeEventListener('pehchaan_leaderboard_updated', handleUpdate);
+      window.removeEventListener('pehchaan_live_days_changed', handleUpdate);
+    };
   }, [selectedDay]);
 
   const filteredOverall = useMemo(() => {
