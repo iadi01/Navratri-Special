@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { ArrowRight, CalendarDays, Compass, ScrollText, LockKeyhole, Trophy, BookOpen, Crown, MoveUpRight } from 'lucide-react';
+import { ArrowRight, CalendarDays, Compass, ScrollText, LockKeyhole, Trophy, BookOpen, Crown, MoveUpRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
 import art from '@/assets/heroines-cute.jpg';
@@ -62,6 +62,15 @@ function Index() {
                 <Link to="/heroines">
                   Meet the heroines <BookOpen />
                 </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                type="button"
+                onClick={() => window.dispatchEvent(new Event('pehchaan_replay_intro'))}
+                className="gap-2 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+              >
+                <Play size={16} className="fill-primary" /> Watch Intro
               </Button>
             </div>
             <div className="hero-date">

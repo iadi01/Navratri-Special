@@ -11,6 +11,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import { SiteHeader } from "@/components/site-header";
+import { IntroVideoModal } from "@/components/intro-video-modal";
 import appCss from "../styles.css?url";
 import { reportRuntimeError } from "../lib/error-reporting";
 
@@ -134,6 +135,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <IntroVideoModal />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <SiteHeader />
       <Outlet />
