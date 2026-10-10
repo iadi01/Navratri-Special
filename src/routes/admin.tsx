@@ -69,6 +69,8 @@ function AdminPage() {
   // Login form state
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
 
   // Live days state
@@ -226,16 +228,48 @@ function AdminPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                value={passwordInput}
-                onChange={e => setPasswordInput(e.target.value)}
-                required
-              />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer select-none transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <>
+                      <EyeOff size={13} />
+                      <span>Hide password</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={13} />
+                      <span>Show password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder={showPassword ? 'Enter admin password' : '••••••••'}
+                  value={passwordInput}
+                  onChange={e => setPasswordInput(e.target.value)}
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5 transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full mt-2" size="lg">
@@ -768,15 +802,47 @@ function AdminPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="admin-password" className="text-xs">Password</Label>
-                  <Input
-                    id="admin-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    required
-                  />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="admin-password" className="text-xs">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewAdminPassword(!showNewAdminPassword)}
+                      className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer select-none transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showNewAdminPassword ? (
+                        <>
+                          <EyeOff size={12} />
+                          <span>Hide</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye size={12} />
+                          <span>Show</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="admin-password"
+                      type={showNewAdminPassword ? 'text' : 'password'}
+                      placeholder={showNewAdminPassword ? 'Enter new admin password' : '••••••••'}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className="pr-9"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewAdminPassword(!showNewAdminPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5 transition-colors"
+                      aria-label={showNewAdminPassword ? 'Hide password' : 'Show password'}
+                      tabIndex={-1}
+                    >
+                      {showNewAdminPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
