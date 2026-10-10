@@ -93,6 +93,7 @@ function AdminPage() {
   const [newName, setNewName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<AdminRole>('admin');
+  const [isAddingAdmin, setIsAddingAdmin] = useState(false);
   const [adminActionMsg, setAdminActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
 
@@ -161,24 +162,31 @@ function AdminPage() {
     e.preventDefault();
     if (!session.user) return;
     setAdminActionMsg(null);
+    setIsAddingAdmin(true);
 
-    const res = await addAdmin(session.user, {
-      username: newUsername,
-      name: newName,
-      password: newPassword,
-      role: newRole,
-    });
+    try {
+      const res = await addAdmin(session.user, {
+        username: newUsername,
+        name: newName,
+        password: newPassword,
+        role: newRole,
+      });
 
-    if (res.success) {
-      setAdminActionMsg({ type: 'success', text: `Admin @${newUsername} successfully created!` });
-      setNewUsername('');
-      setNewName('');
-      setNewPassword('');
-      setNewRole('admin');
-      const list = await syncAdminsFromServer();
-      setAdminList(list);
-    } else {
-      setAdminActionMsg({ type: 'error', text: res.error || 'Failed to create admin' });
+      if (res.success) {
+        setAdminActionMsg({ type: 'success', text: `Admin @${newUsername} successfully saved to MongoDB Atlas!` });
+        setNewUsername('');
+        setNewName('');
+        setNewPassword('');
+        setNewRole('admin');
+        const list = await syncAdminsFromServer();
+        setAdminList(list);
+      } else {
+        setAdminActionMsg({ type: 'error', text: res.error || 'Failed to create admin in database' });
+      }
+    } catch (err: any) {
+      setAdminActionMsg({ type: 'error', text: err?.message || 'Error communicating with server' });
+    } finally {
+      setIsAddingAdmin(false);
     }
   };
 
@@ -880,8 +888,9 @@ function AdminPage() {
                   </select>
                 </div>
 
-                <Button type="submit" className="w-full mt-2" size="sm">
-                  <UserPlus size={14} className="mr-1.5" /> Add Administrator
+                <Button type="submit" className="w-full mt-2" size="sm" disabled={isAddingAdmin}>
+                  <UserPlus size={14} className="mr-1.5" />
+                  {isAddingAdmin ? 'Saving to Database...' : 'Add Administrator'}
                 </Button>
               </form>
             </div>

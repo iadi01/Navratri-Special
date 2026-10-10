@@ -245,21 +245,37 @@ export async function saveAdminToMongo(newAdmin: {
       return { success: false, error: 'Database not connected to save admin.' };
     }
 
-    const cleanUsername = newAdmin.username.trim().toLowerCase();
-    const adminsCol = db.collection('admins');
+    const cleanUsername = (newAdmin.username || '').trim().toLowerCase();
+    const cleanPassword = (newAdmin.password || '').trim();
+    const cleanName = (newAdmin.name || '').trim() || cleanUsername;
+    const cleanRole = newAdmin.role === 'main_admin' ? 'main_admin' : 'admin';
 
-    const exists = await adminsCol.findOne({ username: cleanUsername });
-    if (exists) {
-      return { success: false, error: 'An admin with this username already exists.' };
+    if (!cleanUsername || cleanUsername.length < 3) {
+      return { success: false, error: 'Username must be at least 3 characters long.' };
+    }
+    if (!cleanPassword || cleanPassword.length < 4) {
+      return { success: false, error: 'Password must be at least 4 characters long.' };
     }
 
-    await adminsCol.insertOne({
-      username: cleanUsername,
-      name: newAdmin.name.trim() || cleanUsername,
-      password: newAdmin.password.trim(),
-      role: newAdmin.role || 'admin',
-      createdAt: new Date().toISOString(),
-    });
+    const adminsCol = db.collection('admins');
+
+    // Upsert so if admin exists, credentials update cleanly; if new, inserted cleanly
+    await adminsCol.updateOne(
+      { username: cleanUsername },
+      {
+        $set: {
+          username: cleanUsername,
+          name: cleanName,
+          password: cleanPassword,
+          role: cleanRole,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date().toISOString(),
+        },
+      },
+      { upsert: true }
+    );
 
     return { success: true };
   } catch (err: any) {
@@ -275,6 +291,11 @@ export async function deleteAdminFromMongo(usernameToDelete: string): Promise<{ 
     }
 
     const cleanUsername = usernameToDelete.trim().toLowerCase();
+    const mainUser = (process.env.MAIN_ADMIN_USERNAME || 'kuchupuchu').trim().toLowerCase();
+    if (cleanUsername === mainUser) {
+      return { success: false, error: 'Cannot delete the Main Admin account.' };
+    }
+
     const adminsCol = db.collection('admins');
     await adminsCol.deleteOne({ username: cleanUsername });
 

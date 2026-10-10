@@ -252,17 +252,24 @@ export async function addAdmin(
 
   // 2. Cache in local storage
   const admins = readStoredAdmins();
-  if (!admins.some(a => a.username.toLowerCase() === trimmedUsername)) {
-    const newEntry: StoredAdmin = {
+  const existingIdx = admins.findIndex(a => a.username.toLowerCase() === trimmedUsername);
+  if (existingIdx >= 0) {
+    admins[existingIdx] = {
+      ...admins[existingIdx],
+      name: newAdmin.name.trim() || trimmedUsername,
+      role: newAdmin.role || 'admin',
+      passwordHash: trimmedPassword,
+    };
+  } else {
+    admins.push({
       username: trimmedUsername,
       name: newAdmin.name.trim() || trimmedUsername,
       role: newAdmin.role || 'admin',
       passwordHash: trimmedPassword,
       createdAt: new Date().toISOString(),
-    };
-    admins.push(newEntry);
-    writeStoredAdmins(admins);
+    });
   }
+  writeStoredAdmins(admins);
 
   return { success: true };
 }
