@@ -10,7 +10,10 @@ export type DbStatus = {
 };
 
 export function getMongoUri(): string | undefined {
-  return process.env.MONGODB_URI;
+  return (
+    process.env.MONGODB_URI ||
+    'mongodb+srv://adijsr5_db_user:XVNbidC0h3jrtztC@cluster0.svhkh5j.mongodb.net/pehchaan_kaun?retryWrites=true&w=majority&appName=Cluster0'
+  );
 }
 
 export function isRealAtlasUri(uri?: string): boolean {

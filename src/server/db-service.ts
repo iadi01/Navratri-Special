@@ -150,28 +150,7 @@ export async function validateAdminLogin(
     return { success: false, error: 'Please enter both username and password.' };
   }
 
-  // 1. Check Main Administrator (configured via env or fallback)
-  const envMainUser = (process.env.MAIN_ADMIN_USERNAME || 'kuchupuchu').trim();
-  const envMainPass = (process.env.MAIN_ADMIN_PASSWORD || 'mybestfriendnilay420').trim();
-
-  // Case-insensitive username check, exact password check
-  if (cleanUser.toLowerCase() === envMainUser.toLowerCase()) {
-    if (cleanPass === envMainPass) {
-      return {
-        success: true,
-        user: {
-          username: envMainUser,
-          name: 'Chief Curator (Main Admin)',
-          role: 'main_admin',
-          createdAt: new Date().toISOString(),
-        },
-      };
-    } else {
-      return { success: false, error: 'Invalid password. Please check and try again.' };
-    }
-  }
-
-  // 2. Check MongoDB Atlas Admins collection for any sub-admins
+  // 1. Check MongoDB Atlas Admins collection first
   try {
     const { db, status } = await connectToDatabase();
     if (db && status.connected) {
@@ -199,6 +178,27 @@ export async function validateAdminLogin(
     }
   } catch (err: any) {
     console.error('MongoDB admin validation error:', err?.message);
+  }
+
+  // 2. Check Main Administrator (configured via env or fallback)
+  const envMainUser = (process.env.MAIN_ADMIN_USERNAME || 'kuchupuchu').trim();
+  const envMainPass = (process.env.MAIN_ADMIN_PASSWORD || 'mybestfriendnilay420').trim();
+
+  // Case-insensitive username check, exact password check
+  if (cleanUser.toLowerCase() === envMainUser.toLowerCase()) {
+    if (cleanPass === envMainPass) {
+      return {
+        success: true,
+        user: {
+          username: envMainUser,
+          name: 'Chief Curator (Main Admin)',
+          role: 'main_admin',
+          createdAt: new Date().toISOString(),
+        },
+      };
+    } else {
+      return { success: false, error: 'Invalid password. Please check and try again.' };
+    }
   }
 
   return { success: false, error: 'Admin account not found. Invalid username or password.' };
