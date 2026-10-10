@@ -38,4 +38,6 @@ dist-ssr
 *.sw?
 .lovable/
 *.mp4
+!public/intro-mobile.mp4
+!public/intro-desktop.mp4
 !public/intro.mp4

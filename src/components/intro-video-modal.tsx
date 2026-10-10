@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, FastForward, ArrowRight, Play } from 'lucide-react';
+import { Volume2, VolumeX, FastForward, Play } from 'lucide-react';
 
 const INTRO_STORAGE_KEY = 'pehchaan_intro_seen_v1';
 
@@ -11,6 +11,14 @@ export function IntroVideoModal() {
   // Sound ALWAYS ON by default as requested
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
+
+  // Auto-detect whether user is on phone (9:16 portrait) or laptop/PC (16:9 landscape)
+  const checkIsMobilePortrait = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(orientation: portrait)').matches || window.innerWidth <= 768;
+  };
+
+  const [isMobile, setIsMobile] = useState<boolean>(checkIsMobilePortrait);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const startIntro = () => {
@@ -18,6 +26,7 @@ export function IntroVideoModal() {
     setCanSkip(false);
     setSecondsRemaining(5);
     setIsMuted(false);
+    setIsMobile(checkIsMobilePortrait());
     setIsOpen(true);
     setIsPlaying(true);
   };
@@ -46,8 +55,17 @@ export function IntroVideoModal() {
 
     const handleReplayEvent = () => startIntro();
     window.addEventListener('pehchaan_replay_intro', handleReplayEvent);
+
+    const handleOrientationChange = () => {
+      setIsMobile(checkIsMobilePortrait());
+    };
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+
     return () => {
       window.removeEventListener('pehchaan_replay_intro', handleReplayEvent);
+      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
     };
   }, []);
 
@@ -112,7 +130,7 @@ export function IntroVideoModal() {
     };
 
     tryPlayWithSound();
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   const handleClose = () => {
     if (isFadingOut) return;
@@ -156,6 +174,8 @@ export function IntroVideoModal() {
 
   if (!isOpen) return null;
 
+  const currentVideoSrc = isMobile ? '/intro-mobile.mp4' : '/intro-desktop.mp4';
+
   return (
     <div
       className={`fixed inset-0 z-[99999] bg-black flex items-center justify-center overflow-hidden transition-opacity duration-500 ${
@@ -163,16 +183,21 @@ export function IntroVideoModal() {
       }`}
       aria-label="Welcome Intro Video"
     >
-      {/* Main Video Player - 100% native aspect ratio preserved with zero crop */}
+      {/* Main Video Player - 9:16 on Mobile, 16:9 on Desktop/Laptop */}
       <video
+        key={isMobile ? 'mobile-9-16' : 'desktop-16-9'}
         ref={videoRef}
-        src="/intro.mp4"
+        src={currentVideoSrc}
         className="w-full h-full max-h-screen max-w-full object-contain bg-black cursor-pointer select-none"
         playsInline
         autoPlay
         onClick={togglePlay}
         onEnded={handleClose}
-      />
+      >
+        <source src="/intro-mobile.mp4" type="video/mp4" media="(orientation: portrait)" />
+        <source src="/intro-desktop.mp4" type="video/mp4" media="(orientation: landscape)" />
+        <source src={currentVideoSrc} type="video/mp4" />
+      </video>
 
       {/* Top Floating Controls - Minimalist, no dark strip covering the video */}
       <div className="absolute top-3 left-3 right-3 md:top-4 md:left-5 md:right-5 flex items-center justify-between pointer-events-none z-10">
@@ -227,8 +252,8 @@ export function IntroVideoModal() {
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] cursor-pointer"
         >
-          <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-300/40 backdrop-blur-md flex items-center justify-center text-amber-300 shadow-2xl hover:scale-110 transition-transform">
-            <Play size={28} className="translate-x-0.5 fill-amber-300/40" />
+          <div className="w-16 h-16 rounded-full bg-white/15 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 transition-transform">
+            <Play size={28} className="translate-x-0.5 fill-white/30" />
           </div>
         </div>
       )}
