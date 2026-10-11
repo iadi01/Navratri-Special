@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Edit3,
   AlertCircle,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
