@@ -87,13 +87,17 @@ export function IntroVideoModal() {
     return () => clearInterval(timer);
   }, [isOpen]);
 
-  // Autoplay with Sound ALWAYS ON
+  // Track if user explicitly clicked the mute button
+  const userManuallyMutedRef = useRef(false);
+
+  // Autoplay with Sound ALWAYS ON by default
   useEffect(() => {
     if (!isOpen || !videoRef.current) return;
 
     const video = videoRef.current;
     video.currentTime = 0;
     video.volume = 1.0;
+    userManuallyMutedRef.current = false;
     video.muted = false;
     setIsMuted(false);
 
@@ -105,27 +109,29 @@ export function IntroVideoModal() {
         setIsMuted(false);
         setIsPlaying(true);
       } catch (err) {
-        // Modern mobile/desktop browsers block audio before 1st user interaction
+        // If mobile/desktop browser enforces autoplay restriction before gesture:
         try {
           video.muted = true;
-          setIsMuted(true);
           await video.play();
           setIsPlaying(true);
 
-          const unmuteOnInteraction = () => {
-            if (videoRef.current) {
+          // Listen for first interaction anywhere on window to immediately turn sound ON
+          const unmuteOnGesture = () => {
+            if (videoRef.current && !userManuallyMutedRef.current) {
               videoRef.current.volume = 1.0;
               videoRef.current.muted = false;
               setIsMuted(false);
             }
-            window.removeEventListener('click', unmuteOnInteraction);
-            window.removeEventListener('touchstart', unmuteOnInteraction);
-            window.removeEventListener('keydown', unmuteOnInteraction);
+            window.removeEventListener('click', unmuteOnGesture, { capture: true });
+            window.removeEventListener('touchstart', unmuteOnGesture, { capture: true });
+            window.removeEventListener('pointerdown', unmuteOnGesture, { capture: true });
+            window.removeEventListener('keydown', unmuteOnGesture, { capture: true });
           };
 
-          window.addEventListener('click', unmuteOnInteraction, { once: true });
-          window.addEventListener('touchstart', unmuteOnInteraction, { once: true });
-          window.addEventListener('keydown', unmuteOnInteraction, { once: true });
+          window.addEventListener('click', unmuteOnGesture, { capture: true });
+          window.addEventListener('touchstart', unmuteOnGesture, { capture: true });
+          window.addEventListener('pointerdown', unmuteOnGesture, { capture: true });
+          window.addEventListener('keydown', unmuteOnGesture, { capture: true });
         } catch {
           /* ignore play errors */
         }
@@ -156,16 +162,30 @@ export function IntroVideoModal() {
     }, 450);
   };
 
+  // Only mutes when user explicitly clicks the mute button!
   const toggleSound = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!videoRef.current) return;
     const nextMuted = !videoRef.current.muted;
     videoRef.current.muted = nextMuted;
+    userManuallyMutedRef.current = nextMuted;
     setIsMuted(nextMuted);
   };
 
-  const togglePlay = () => {
+  const handleVideoClick = () => {
     if (!videoRef.current) return;
+    // If video is currently muted (by browser restriction), first tap unmutes sound!
+    if (videoRef.current.muted) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+      userManuallyMutedRef.current = false;
+      setIsMuted(false);
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+      return;
+    }
+
+    // Otherwise toggle play/pause
     if (videoRef.current.paused) {
       videoRef.current.play();
       setIsPlaying(true);
@@ -195,7 +215,7 @@ export function IntroVideoModal() {
         playsInline
         autoPlay
         preload="auto"
-        onClick={togglePlay}
+        onClick={handleVideoClick}
         onEnded={handleClose}
       >
         <source src="/intro-mobile.mp4" type="video/mp4" media="(orientation: portrait)" />
@@ -205,25 +225,25 @@ export function IntroVideoModal() {
 
       {/* Top Floating Controls - Minimalist, no dark strip covering the video */}
       <div className="absolute top-3 left-3 right-3 md:top-4 md:left-5 md:right-5 flex items-center justify-between pointer-events-none z-10">
-        {/* Left: Sound Toggle - Flat, subtle dark glass */}
+        {/* Left: Sound Toggle - Default Sound ON, user can mute anytime */}
         <div className="pointer-events-auto">
           <button
             onClick={toggleSound}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-md border text-[11px] font-medium transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full backdrop-blur-md border text-[11px] font-semibold transition-all duration-200 cursor-pointer shadow-md ${
               !isMuted
-                ? 'bg-black/35 hover:bg-black/55 border-white/15 text-white/80 hover:text-white'
-                : 'bg-black/50 hover:bg-black/70 border-white/20 text-white/50'
+                ? 'bg-black/50 hover:bg-black/70 border-emerald-500/40 text-emerald-400'
+                : 'bg-black/55 hover:bg-black/75 border-white/20 text-white/50'
             }`}
             aria-label={isMuted ? 'Unmute video' : 'Mute video'}
           >
             {!isMuted ? (
               <>
-                <Volume2 size={13} className="text-emerald-400" />
+                <Volume2 size={14} className="text-emerald-400 animate-pulse" />
                 <span>Sound On</span>
               </>
             ) : (
               <>
-                <VolumeX size={13} className="text-white/50" />
+                <VolumeX size={14} className="text-white/60" />
                 <span>Muted</span>
               </>
             )}
@@ -253,7 +273,7 @@ export function IntroVideoModal() {
       {/* Paused Overlay Indicator */}
       {!isPlaying && (
         <div
-          onClick={togglePlay}
+          onClick={handleVideoClick}
           className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[2px] cursor-pointer"
         >
           <div className="w-16 h-16 rounded-full bg-white/15 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 transition-transform">
