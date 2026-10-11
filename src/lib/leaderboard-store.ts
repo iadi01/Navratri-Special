@@ -13,6 +13,7 @@ export type LeaderboardEntry = {
   firstTryCount: number;
   totalQuestions: number;
   submittedAt: string;
+  clientIp?: string;
 };
 
 export type OverallLeaderboardEntry = {
@@ -29,6 +30,7 @@ export type OverallLeaderboardEntry = {
   firstTryTotal: number;
   bestDay: number;
   lastActive: string;
+  clientIp?: string;
   dayBreakdown: {
     day: number;
     points: number;
@@ -40,6 +42,7 @@ export type OverallLeaderboardEntry = {
 
 const LEADERBOARD_KEY = 'pehchaan_leaderboard_v1';
 const USER_PROFILE_KEY = 'pehchaan_user_profile_v1';
+const QUIZ_ATTEMPTS_PREFIX = 'pehchaan_attempt_day_';
 
 export type UserProfile = {
   username: string;
@@ -47,8 +50,11 @@ export type UserProfile = {
   course: string;
   year: string;
   batch: string;
-  rollNo?: string;
+  rollNo: string;
   email?: string;
+  editCount: number; // 0: initially saved, 1: first edit, 2: second edit (LOCKED)
+  isLocked: boolean; // true if editCount >= 2
+  savedAt?: string;
 };
 
 // Zero fake users - Leaderboard is clean for live participants
@@ -58,17 +64,137 @@ export function getSavedUserProfile(): UserProfile | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(USER_PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      username: parsed.username || parsed.fullName || '',
+      fullName: parsed.fullName || parsed.username || '',
+      course: parsed.course || 'BCA',
+      year: parsed.year || '1st Sem',
+      batch: parsed.batch || '',
+      rollNo: parsed.rollNo || '',
+      email: parsed.email || '',
+      editCount: typeof parsed.editCount === 'number' ? parsed.editCount : 0,
+      isLocked: parsed.editCount >= 2,
+      savedAt: parsed.savedAt,
+    };
   } catch {
     return null;
   }
 }
 
-export function saveUserProfile(profile: UserProfile) {
+export function saveUserProfile(profile: Partial<UserProfile>): { success: boolean; profile: UserProfile; error?: string } {
+  if (typeof window === 'undefined') {
+    return {
+      success: false,
+      profile: profile as UserProfile,
+      error: 'Window not available',
+    };
+  }
+
+  const existing = getSavedUserProfile();
+  let editCount = existing ? existing.editCount : 0;
+
+  // If already exists and user is modifying fields, check edit count limit
+  if (existing && existing.rollNo) {
+    const hasChanged =
+      (profile.fullName && profile.fullName !== existing.fullName) ||
+      (profile.course && profile.course !== existing.course) ||
+      (profile.year && profile.year !== existing.year) ||
+      (profile.batch && profile.batch !== existing.batch) ||
+      (profile.rollNo && profile.rollNo !== existing.rollNo);
+
+    if (hasChanged) {
+      if (editCount >= 2) {
+        return {
+          success: false,
+          profile: existing,
+          error: 'Maximum 2 edits reached. Details are permanently locked.',
+        };
+      }
+      editCount += 1;
+    }
+  }
+
+  const updated: UserProfile = {
+    username: (profile.fullName || profile.username || existing?.username || '').trim(),
+    fullName: (profile.fullName || existing?.fullName || '').trim(),
+    course: (profile.course || existing?.course || 'BCA').trim(),
+    year: (profile.year || existing?.year || '1st Sem').trim(),
+    batch: (profile.batch || existing?.batch || '').trim(),
+    rollNo: (profile.rollNo || existing?.rollNo || '').trim().toUpperCase(),
+    email: (profile.email || existing?.email || '').trim(),
+    editCount,
+    isLocked: editCount >= 2,
+    savedAt: new Date().toISOString(),
+  };
+
+  try {
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updated));
+    // Also sync to server database
+    fetch('/api/users/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
+  } catch {}
+
+  return { success: true, profile: updated };
+}
+
+// ---------------------------------------------------------------------------
+// 🛡️ 1-ATTEMPT PER DAY VERIFICATION (Client + Server sync)
+// ---------------------------------------------------------------------------
+
+export function isQuizAttempted(day: number, rollNo?: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const cleanRoll = rollNo ? rollNo.trim().toUpperCase() : '';
+    // Check specific roll number attempt key
+    if (cleanRoll && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanRoll}`)) {
+      return true;
+    }
+    // Check general device attempt key for this day
+    if (localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`)) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function markQuizAttempted(day: number, rollNo?: string, scoreInfo?: any): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+    const cleanRoll = rollNo ? rollNo.trim().toUpperCase() : '';
+    const payload = JSON.stringify({
+      attemptedAt: new Date().toISOString(),
+      day,
+      rollNo: cleanRoll,
+      score: scoreInfo,
+    });
+    localStorage.setItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`, payload);
+    if (cleanRoll) {
+      localStorage.setItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanRoll}`, payload);
+    }
   } catch {}
+}
+
+export async function checkServerAttempt(day: number, rollNo?: string): Promise<{ attempted: boolean; existingScore?: any }> {
+  if (typeof window === 'undefined') return { attempted: false };
+  try {
+    const cleanRoll = rollNo ? encodeURIComponent(rollNo.trim().toUpperCase()) : '';
+    const res = await fetch(`/api/check-attempt?day=${day}&rollNo=${cleanRoll}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.attempted) {
+        markQuizAttempted(day, rollNo, data.existingScore);
+      }
+      return data;
+    }
+  } catch {}
+  return { attempted: isQuizAttempted(day, rollNo) };
 }
 
 export function readLeaderboardFromStorage(): LeaderboardEntry[] {
@@ -277,6 +403,13 @@ export function submitLeaderboardScore(params: {
 
   const dayLeaderboard = sortLeaderboard(updated.filter(e => e.day === params.day));
   const rank = dayLeaderboard.findIndex(e => e.id === newEntry.id) + 1;
+  const finalRank = rank > 0 ? rank : 1;
+
+  markQuizAttempted(params.day, params.rollNo, {
+    points: params.points,
+    timeSeconds: Number(params.timeSeconds.toFixed(1)),
+    rank: finalRank,
+  });
 
   if (typeof window !== 'undefined') {
     fetch('/api/scores', {
@@ -289,6 +422,6 @@ export function submitLeaderboardScore(params: {
   return {
     success: true,
     entry: newEntry,
-    rank: rank > 0 ? rank : 1,
+    rank: finalRank,
   };
 }

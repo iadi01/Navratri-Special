@@ -747,7 +747,11 @@ function AdminPage() {
                 </div>
                 <div>
                   <span className="text-muted-foreground block">Roll No / ID:</span>
-                  <strong className="text-foreground text-sm">{selectedStudent.rollNo || 'N/A'}</strong>
+                  <strong className="text-foreground text-sm font-mono">{selectedStudent.rollNo || 'N/A'}</strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Network / IP:</span>
+                  <span className="text-foreground text-xs font-mono">{selectedStudent.clientIp || 'Web Client'}</span>
                 </div>
               </div>
             </div>

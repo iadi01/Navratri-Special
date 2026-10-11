@@ -14,6 +14,8 @@ import {
   deleteAdminFromMongo,
   getLiveDaysFromMongo,
   saveLiveDaysToMongo,
+  checkAttemptInMongo,
+  saveUserProfileToMongo,
 } from "./server/db-service";
 
 type ServerEntry = {
@@ -61,14 +63,57 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url);
 
+    // Extract client IP (Cloudflare, Proxy, or direct)
+    const clientIp =
+      request.headers.get('cf-connecting-ip') ||
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      '127.0.0.1';
+
     // =========================================================================
     // 📦 MONGODB ATLAS DIRECT API HANDLERS
     // =========================================================================
+
+    // 🛡️ Check if user / device already attempted today's quiz
+    if (url.pathname === '/api/check-attempt' && request.method === 'GET') {
+      try {
+        const day = Number(url.searchParams.get('day') || 1);
+        const rollNo = url.searchParams.get('rollNo') || undefined;
+        const result = await checkAttemptInMongo(day, rollNo, clientIp);
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ attempted: false }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 👤 Save / update user profile with max 2 edit restriction
+    if (url.pathname === '/api/users/profile' && request.method === 'POST') {
+      try {
+        const profile = await request.json();
+        const res = await saveUserProfileToMongo(profile, clientIp);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
     if (url.pathname === '/api/scores') {
       if (request.method === 'POST') {
         try {
           const entry = await request.json();
-          const res = await saveScoreToMongo(entry);
+          const res = await saveScoreToMongo(entry, clientIp);
           return new Response(JSON.stringify(res), {
             status: res.success ? 200 : 500,
             headers: { 'content-type': 'application/json' },

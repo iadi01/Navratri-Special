@@ -1,15 +1,36 @@
 import { connectToDatabase, type DbStatus } from '@/lib/mongodb';
 import type { LeaderboardEntry, UserProfile } from '@/lib/leaderboard-store';
 
-export async function saveScoreToMongo(entry: LeaderboardEntry): Promise<{ success: boolean; error?: string }> {
+export async function saveScoreToMongo(
+  entry: LeaderboardEntry,
+  clientIp?: string
+): Promise<{ success: boolean; error?: string; rank?: number }> {
   try {
     const { db, status } = await connectToDatabase();
     if (!db || !status.connected) {
       return { success: false, error: status.message };
     }
 
-    // 1. Save or update score entry in leaderboard collection
     const leaderboardCol = db.collection('leaderboard');
+    const cleanRollNo = (entry.rollNo || '').trim().toUpperCase();
+    const cleanDay = Number(entry.day);
+
+    // 🛡️ 1-Attempt Security Check: Check if this roll number already submitted for this day
+    if (cleanRollNo) {
+      const existing = await leaderboardCol.findOne({
+        day: cleanDay,
+        rollNo: cleanRollNo,
+      });
+
+      if (existing && existing.id !== entry.id) {
+        return {
+          success: false,
+          error: `Day ${cleanDay} quiz has already been submitted for Roll No: ${cleanRollNo}. Only 1 attempt per day is allowed.`,
+        };
+      }
+    }
+
+    // 1. Save or update score entry in leaderboard collection with IP
     await leaderboardCol.updateOne(
       { id: entry.id },
       {
@@ -20,13 +41,14 @@ export async function saveScoreToMongo(entry: LeaderboardEntry): Promise<{ succe
           course: entry.course?.trim() || '',
           year: entry.year?.trim() || '',
           batch: entry.batch?.trim() || '',
-          rollNo: entry.rollNo?.trim() || '',
+          rollNo: cleanRollNo,
           email: entry.email?.trim() || '',
-          day: Number(entry.day),
+          day: cleanDay,
           points: Number(entry.points),
           timeSeconds: Number(entry.timeSeconds),
           firstTryCount: Number(entry.firstTryCount || 0),
           totalQuestions: Number(entry.totalQuestions || 3),
+          clientIp: clientIp || entry.clientIp || '',
           submittedAt: entry.submittedAt || new Date().toISOString(),
           createdAt: new Date(),
         },
@@ -45,8 +67,103 @@ export async function saveScoreToMongo(entry: LeaderboardEntry): Promise<{ succe
           course: entry.course?.trim() || '',
           year: entry.year?.trim() || '',
           batch: entry.batch?.trim() || '',
-          rollNo: entry.rollNo?.trim() || '',
+          rollNo: cleanRollNo,
           email: entry.email?.trim() || '',
+          lastIp: clientIp || '',
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+          editCount: 0,
+        },
+      },
+      { upsert: true }
+    );
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Failed to save score to MongoDB:', err?.message);
+    return { success: false, error: err?.message };
+  }
+}
+
+export async function checkAttemptInMongo(
+  day: number,
+  rollNo?: string,
+  clientIp?: string
+): Promise<{ attempted: boolean; reason?: string; existingScore?: any }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { attempted: false };
+    }
+
+    const leaderboardCol = db.collection('leaderboard');
+    const cleanDay = Number(day);
+    const cleanRollNo = (rollNo || '').trim().toUpperCase();
+
+    // Primary check: Roll Number
+    if (cleanRollNo) {
+      const byRoll = await leaderboardCol.findOne({ day: cleanDay, rollNo: cleanRollNo });
+      if (byRoll) {
+        return {
+          attempted: true,
+          reason: `Roll No ${cleanRollNo} has already completed Day ${cleanDay} quiz.`,
+          existingScore: {
+            points: byRoll.points,
+            timeSeconds: byRoll.timeSeconds,
+            submittedAt: byRoll.submittedAt,
+          },
+        };
+      }
+    }
+
+    return { attempted: false };
+  } catch (err: any) {
+    console.error('Error checking attempt in MongoDB:', err?.message);
+    return { attempted: false };
+  }
+}
+
+export async function saveUserProfileToMongo(
+  profile: UserProfile,
+  clientIp?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { success: false, error: status.message };
+    }
+
+    const usersCol = db.collection('users');
+    const cleanRollNo = (profile.rollNo || '').trim().toUpperCase();
+
+    // Lookup user by rollNo if provided, or by username
+    const filter = cleanRollNo ? { rollNo: cleanRollNo } : { username: profile.username.trim().toLowerCase() };
+    const existing = await usersCol.findOne(filter);
+
+    let editCount = profile.editCount || 0;
+    if (existing) {
+      const serverEditCount = typeof existing.editCount === 'number' ? existing.editCount : 0;
+      if (serverEditCount >= 2) {
+        return { success: false, error: 'Maximum 2 edits reached. Details are permanently locked.' };
+      }
+      editCount = Math.max(serverEditCount, editCount);
+    }
+
+    await usersCol.updateOne(
+      filter,
+      {
+        $set: {
+          username: profile.username.trim(),
+          fullName: profile.fullName?.trim() || profile.username.trim(),
+          course: profile.course?.trim() || '',
+          year: profile.year?.trim() || '',
+          batch: profile.batch?.trim() || '',
+          rollNo: cleanRollNo,
+          email: profile.email?.trim() || '',
+          editCount,
+          lastIp: clientIp || '',
           updatedAt: new Date(),
         },
         $setOnInsert: {
@@ -58,7 +175,7 @@ export async function saveScoreToMongo(entry: LeaderboardEntry): Promise<{ succe
 
     return { success: true };
   } catch (err: any) {
-    console.error('Failed to save score to MongoDB:', err?.message);
+    console.error('Failed to save user profile to MongoDB:', err?.message);
     return { success: false, error: err?.message };
   }
 }
@@ -92,6 +209,7 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       firstTryCount: r.firstTryCount || 0,
       totalQuestions: r.totalQuestions || 3,
       submittedAt: r.submittedAt || new Date().toISOString(),
+      clientIp: r.clientIp || '',
     }));
   } catch (err: any) {
     console.error('Failed to get scores from MongoDB:', err?.message);

@@ -5,14 +5,16 @@ import {
   Check,
   Lightbulb,
   Trophy,
-  X,
   Compass,
   Timer,
-  Send,
   CheckCircle2,
   GraduationCap,
   LockKeyhole,
   BookOpen,
+  ShieldAlert,
+  ShieldCheck,
+  Edit3,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
@@ -30,6 +32,9 @@ import {
   submitLeaderboardScore,
   getSavedUserProfile,
   saveUserProfile,
+  isQuizAttempted,
+  checkServerAttempt,
+  type UserProfile,
 } from '@/lib/leaderboard-store';
 
 const BEST_KEY_PREFIX = 'pehchaan-kaun-best-day-';
@@ -92,13 +97,24 @@ function Quiz() {
   const [timeTaken, setTimeTaken] = useState<number>(0);
   const [firstTryCount, setFirstTryCount] = useState<number>(0);
 
-  // Participant profile form state
-  const [playerName, setPlayerName] = useState('');
-  const [course, setCourse] = useState('BCA');
-  const [year, setYear] = useState('1st Sem');
-  const [batch, setBatch] = useState('');
-  const [rollNo, setRollNo] = useState('');
-  const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number } | null>(null);
+  // Participant profile states
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getSavedUserProfile());
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Form input fields
+  const [playerName, setPlayerName] = useState(() => userProfile?.fullName || userProfile?.username || '');
+  const [course, setCourse] = useState(() => userProfile?.course || 'BCA');
+  const [year, setYear] = useState(() => userProfile?.year || '1st Sem');
+  const [batch, setBatch] = useState(() => userProfile?.batch || '');
+  const [rollNo, setRollNo] = useState(() => userProfile?.rollNo || '');
+
+  // 1-Attempt Security Check state
+  const [hasAttemptedToday, setHasAttemptedToday] = useState(false);
+  const [attemptReason, setAttemptReason] = useState<string | null>(null);
+
+  // Submission result state
+  const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean } | null>(null);
 
   useEffect(() => {
     setBest(readBestForDay(targetDay));
@@ -112,18 +128,90 @@ function Quiz() {
     setFirstTryCount(0);
     setSubmissionResult(null);
 
-    // Load saved user profile if available
-    const saved = getSavedUserProfile();
-    if (saved) {
-      setPlayerName(saved.fullName || saved.username || '');
-      setCourse(saved.course || 'BCA');
-      setYear(saved.year || '1st Sem');
-      setBatch(saved.batch || '');
-      setRollNo(saved.rollNo || '');
+    const profile = getSavedUserProfile();
+    setUserProfile(profile);
+    if (profile) {
+      setPlayerName(profile.fullName || profile.username || '');
+      setCourse(profile.course || 'BCA');
+      setYear(profile.year || '1st Sem');
+      setBatch(profile.batch || '');
+      setRollNo(profile.rollNo || '');
+      setIsEditingProfile(!profile.rollNo);
+    } else {
+      setIsEditingProfile(true);
+    }
+
+    // Check 1 attempt locally and with server
+    const localAttempted = isQuizAttempted(targetDay, profile?.rollNo);
+    if (localAttempted) {
+      setHasAttemptedToday(true);
+      setAttemptReason(`You have already completed Day ${targetDay} challenge on this device.`);
+    } else {
+      checkServerAttempt(targetDay, profile?.rollNo).then((res) => {
+        if (res.attempted) {
+          setHasAttemptedToday(true);
+          setAttemptReason(res.reason || `Day ${targetDay} has already been completed.`);
+        } else {
+          setHasAttemptedToday(false);
+          setAttemptReason(null);
+        }
+      });
     }
   }, [targetDay]);
 
+  const handleConfirmProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+
+    const cleanName = playerName.trim();
+    const cleanRoll = rollNo.trim().toUpperCase();
+
+    if (!cleanName) {
+      setProfileError('Please enter your full name.');
+      return;
+    }
+    if (!cleanRoll) {
+      setProfileError('Please enter your University / College Roll Number.');
+      return;
+    }
+
+    const res = saveUserProfile({
+      fullName: cleanName,
+      username: cleanName,
+      rollNo: cleanRoll,
+      course: course.trim(),
+      year: year.trim(),
+      batch: batch.trim(),
+    });
+
+    if (!res.success) {
+      setProfileError(res.error || 'Failed to update details.');
+      return;
+    }
+
+    setUserProfile(res.profile);
+    setIsEditingProfile(false);
+
+    // Re-check attempt with this roll number
+    checkServerAttempt(targetDay, cleanRoll).then((attemptRes) => {
+      if (attemptRes.attempted) {
+        setHasAttemptedToday(true);
+        setAttemptReason(attemptRes.reason || `Roll No ${cleanRoll} has already completed Day ${targetDay} quiz.`);
+      }
+    });
+  };
+
   const handleStart = () => {
+    if (!userProfile || !userProfile.rollNo || !userProfile.fullName) {
+      setIsEditingProfile(true);
+      setProfileError('Please fill and confirm your participant details before starting.');
+      return;
+    }
+
+    if (hasAttemptedToday) {
+      return;
+    }
+
     startTimeRef.current = Date.now();
     setStarted(true);
     setDone(false);
@@ -157,54 +245,40 @@ function Quiz() {
       const elapsedSeconds = Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1));
       setTimeTaken(elapsedSeconds);
       setDone(true);
+      setHasAttemptedToday(true);
+
       try {
         const currentBest = readBestForDay(targetDay);
         if (points > currentBest) {
           localStorage.setItem(`${BEST_KEY_PREFIX}${targetDay}`, String(points));
           setBest(points);
         }
-      } catch {
-        /* storage unavailable */
-      }
+      } catch {}
+
+      // 🚀 AUTO SAVE SCORE IMMEDIATELY (User cannot bypass by closing or restarting)
+      const currentRoll = (userProfile?.rollNo || rollNo).trim().toUpperCase();
+      const currentName = (userProfile?.fullName || playerName).trim();
+
+      const subRes = submitLeaderboardScore({
+        username: currentName,
+        fullName: currentName,
+        course: (userProfile?.course || course).trim(),
+        year: (userProfile?.year || year).trim(),
+        batch: (userProfile?.batch || batch).trim(),
+        rollNo: currentRoll,
+        day: targetDay,
+        points,
+        timeSeconds: elapsedSeconds,
+        firstTryCount,
+        totalQuestions: questions.length,
+      });
+
+      setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true });
       return;
     }
     setIndex(i => i + 1);
     setMissed([]);
     setSolved(false);
-  };
-
-  const restart = () => {
-    handleStart();
-  };
-
-  const handleLeaderboardSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!playerName.trim()) return;
-
-    saveUserProfile({
-      username: playerName.trim(),
-      fullName: playerName.trim(),
-      course: course.trim(),
-      year: year.trim(),
-      batch: batch.trim(),
-      rollNo: rollNo.trim(),
-    });
-
-    const res = submitLeaderboardScore({
-      username: playerName.trim(),
-      fullName: playerName.trim(),
-      course: course.trim(),
-      year: year.trim(),
-      batch: batch.trim(),
-      rollNo: rollNo.trim(),
-      day: targetDay,
-      points,
-      timeSeconds: timeTaken,
-      firstTryCount,
-      totalQuestions: questions.length,
-    });
-
-    setSubmissionResult({ submitted: true, rank: res.rank });
   };
 
   const isLive = liveDays.includes(targetDay);
@@ -256,12 +330,204 @@ function Quiz() {
               Read the clue, pick the name, and explore her story. Quick thinking and first-try accuracy
               earn maximum points and boost your rank on the Leaderboard!
             </p>
-            <div className="quiz-actions">
-              <Button size="lg" onClick={handleStart}>
-                Start playing <ArrowRight />
-              </Button>
-              {best > 0 && <span className="quiz-best">Your best: {best} points</span>}
-            </div>
+
+            {/* ALREADY ATTEMPTED ALERT */}
+            {hasAttemptedToday ? (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 my-5 text-center space-y-3 animate-in fade-in">
+                <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                  <ShieldAlert size={22} />
+                </div>
+                <h3 className="text-base font-bold text-foreground">
+                  You Have Already Completed Day {String(currentQuiz.day).padStart(2, '0')}!
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  {attemptReason || 'Only 1 attempt per day is allowed per student to ensure 100% fair leaderboard rankings.'}
+                </p>
+                <div className="pt-2 flex justify-center gap-2">
+                  <Button asChild>
+                    <Link to="/leaderboard" search={{ day: targetDay }}>
+                      View Today's Leaderboard <Trophy size={14} className="ml-1.5" />
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/heroines">Hall of Heroines</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* PARTICIPANT DETAILS & START SECTION */
+              <div className="my-5">
+                {(!userProfile?.rollNo || isEditingProfile) ? (
+                  /* Form to enter / edit details */
+                  <div className="bg-card border border-border rounded-xl p-5 text-left shadow-sm space-y-3.5 max-w-lg mx-auto">
+                    <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap size={17} className="text-primary" />
+                        <div>
+                          <h4 className="text-xs font-bold text-foreground">Participant Registration</h4>
+                          <p className="text-[11px] text-muted-foreground">Confirm your verified details before starting the quiz</p>
+                        </div>
+                      </div>
+                      {userProfile?.rollNo && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
+                          {2 - (userProfile.editCount || 0)} edits left
+                        </span>
+                      )}
+                    </div>
+
+                    {profileError && (
+                      <div className="p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs flex items-center gap-2">
+                        <AlertCircle size={14} className="shrink-0" /> {profileError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleConfirmProfile} className="space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="player-name" className="text-xs">Full Name *</Label>
+                        <Input
+                          id="player-name"
+                          placeholder="e.g. Rahul Sharma"
+                          value={playerName}
+                          onChange={e => setPlayerName(e.target.value)}
+                          className="h-8.5 text-xs"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="player-roll" className="text-xs">University / College Roll No *</Label>
+                        <Input
+                          id="player-roll"
+                          placeholder="e.g. 2024-BCA-042"
+                          value={rollNo}
+                          onChange={e => setRollNo(e.target.value.toUpperCase())}
+                          className="h-8.5 text-xs font-mono"
+                          required
+                        />
+                        <p className="text-[10px] text-muted-foreground">Used to identify your score on the live tournament leaderboard.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="space-y-1">
+                          <Label htmlFor="player-course" className="text-xs">Course / Degree</Label>
+                          <select
+                            id="player-course"
+                            value={course}
+                            onChange={e => setCourse(e.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-8.5 font-medium"
+                          >
+                            <option value="BBA">BBA</option>
+                            <option value="BCA">BCA</option>
+                            <option value="MBA">MBA</option>
+                            <option value="MCA">MCA</option>
+                            <option value="BA">BA</option>
+                            <option value="BAJMC">BAJMC</option>
+                            <option value="BCOM">BCOM</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="player-semester" className="text-xs">Semester</Label>
+                          <select
+                            id="player-semester"
+                            value={year}
+                            onChange={e => setYear(e.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-8.5 font-medium"
+                          >
+                            <option value="1st Sem">1st Sem</option>
+                            <option value="2nd Sem">2nd Sem</option>
+                            <option value="3rd Sem">3rd Sem</option>
+                            <option value="4th Sem">4th Sem</option>
+                            <option value="5th Sem">5th Sem</option>
+                            <option value="6th Sem">6th Sem</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="player-batch" className="text-xs">Batch (Optional)</Label>
+                        <Input
+                          id="player-batch"
+                          placeholder="e.g. 2024–2028 / Batch A"
+                          value={batch}
+                          onChange={e => setBatch(e.target.value)}
+                          className="h-8.5 text-xs"
+                        />
+                      </div>
+
+                      <div className="pt-1 flex gap-2">
+                        <Button type="submit" size="sm" className="w-full gap-1.5 h-9 font-semibold">
+                          <Check size={14} /> Confirm Details & Continue
+                        </Button>
+                        {userProfile?.rollNo && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsEditingProfile(false);
+                              setProfileError(null);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground text-center">
+                        ⚠️ Maximum 2 edits allowed. Score will be automatically recorded upon quiz completion.
+                      </p>
+                    </form>
+                  </div>
+                ) : (
+                  /* Confirmed profile card with 1-click start */
+                  <div className="bg-card border border-border rounded-xl p-4 text-left shadow-sm max-w-lg mx-auto space-y-3">
+                    <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <ShieldCheck size={15} className="text-emerald-500" /> Verified Participant
+                      </span>
+                      {userProfile.isLocked ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground flex items-center gap-1">
+                          <LockKeyhole size={10} /> Locked (Max edits used)
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingProfile(true)}
+                          className="text-[11px] text-primary hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                        >
+                          <Edit3 size={11} /> Edit Details ({2 - (userProfile.editCount || 0)} left)
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Name:</span>
+                        <strong className="text-foreground">{userProfile.fullName}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Roll No:</span>
+                        <strong className="text-foreground font-mono">{userProfile.rollNo}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Course & Sem:</span>
+                        <span className="text-foreground font-medium">{userProfile.course} • {userProfile.year}</span>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Batch:</span>
+                        <span className="text-foreground font-medium">{userProfile.batch || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button size="lg" className="w-full gap-2 text-sm font-bold shadow-md" onClick={handleStart}>
+                        Start Playing Day {String(currentQuiz.day).padStart(2, '0')} <ArrowRight size={15} />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -283,7 +549,7 @@ function Quiz() {
             <div className="eyebrow">
               <Trophy size={14} /> {tier}
             </div>
-            <h2>{points >= maxPoints ? 'Every name, first try. Extraordinary!' : 'You discovered three remarkable women.'}</h2>
+            <h2>{points >= maxPoints ? 'Extraordinary! All names on the first try!' : 'Congratulations! You solved today’s mystery chapter.'}</h2>
 
             {/* Performance Stats: Time & Accuracy */}
             <div className="flex flex-wrap items-center justify-center gap-3 my-4">
@@ -291,105 +557,28 @@ function Quiz() {
                 <Timer size={14} className="text-primary" /> Time: <span className="font-mono text-primary font-bold">{timeTaken}s</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted/60 rounded-full text-xs font-semibold">
-                <DiyaIcon size={14} className="text-amber-600" /> First-Try Accuracy: <span className="font-mono font-bold">{firstTryCount}/{questions.length}</span>
+                <DiyaIcon size={14} className="text-amber-600" /> Accuracy: <span className="font-mono font-bold">{firstTryCount}/{questions.length}</span>
               </div>
             </div>
 
-            {/* Leaderboard Submission Box with Student Details */}
-            <div className="bg-card border border-border rounded-xl p-5 my-4 max-w-lg mx-auto text-left shadow-sm">
-              {!submissionResult?.submitted ? (
-                <form onSubmit={handleLeaderboardSubmit} className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <GraduationCap size={15} className="text-primary" /> Record Score to Leaderboard
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-mono">
-                      Day {String(targetDay).padStart(2, '0')}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="player-name" className="text-xs">Your Name / Username *</Label>
-                    <Input
-                      id="player-name"
-                      placeholder="e.g. amity kumar"
-                      value={playerName}
-                      onChange={e => setPlayerName(e.target.value)}
-                      className="h-8.5 text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <Label htmlFor="player-course" className="text-xs">Course / Degree</Label>
-                      <select
-                        id="player-course"
-                        value={course}
-                        onChange={e => setCourse(e.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-8.5 font-medium"
-                      >
-                        <option value="BBA">BBA</option>
-                        <option value="BCA">BCA</option>
-                        <option value="MBA">MBA</option>
-                        <option value="MCA">MCA</option>
-                        <option value="BA">BA</option>
-                        <option value="BAJMC">BAJMC</option>
-                        <option value="BCOM">BCOM</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="player-semester" className="text-xs">Semester</Label>
-                      <select
-                        id="player-semester"
-                        value={year}
-                        onChange={e => setYear(e.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-8.5 font-medium"
-                      >
-                        <option value="1st Sem">1st Sem</option>
-                        <option value="2nd Sem">2nd Sem</option>
-                        <option value="3rd Sem">3rd Sem</option>
-                        <option value="4th Sem">4th Sem</option>
-                        <option value="5th Sem">5th Sem</option>
-                        <option value="6th Sem">6th Sem</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="player-batch" className="text-xs">Batch</Label>
-                    <Input
-                      id="player-batch"
-                      placeholder="e.g. 2024–2028 / Batch A"
-                      value={batch}
-                      onChange={e => setBatch(e.target.value)}
-                      className="h-8.5 text-xs"
-                    />
-                  </div>
-
-                  <Button type="submit" size="sm" className="w-full gap-1.5 mt-2 h-9">
-                    <Send size={13} /> Submit to Leaderboard
-                  </Button>
-                </form>
-              ) : (
-                <div className="text-center py-3 space-y-2.5">
-                  <div className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
-                    <CheckCircle2 size={18} /> Score & Student Details Recorded!
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    You placed <b>Rank #{submissionResult.rank}</b> for Day {String(targetDay).padStart(2, '0')}.
-                  </p>
-                  <Button variant="secondary" size="sm" asChild className="mt-1">
-                    <Link to="/leaderboard" search={{ day: targetDay }}>
-                      View Leaderboard Rankings <Trophy size={13} className="ml-1.5" />
-                    </Link>
-                  </Button>
-                </div>
-              )}
+            {/* Auto-Saved Confirmation Box */}
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 my-4 max-w-lg mx-auto text-left shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 size={16} /> Score Automatically Recorded!
+                </span>
+                <span className="text-xs font-extrabold text-foreground bg-background/80 px-2.5 py-0.5 rounded-full border border-border">
+                  Rank #{submissionResult?.rank || 1}
+                </span>
+              </div>
+              <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-border/50">
+                <span><b>Participant:</b> {userProfile?.fullName || playerName}</span>
+                <span><b>Roll No:</b> {userProfile?.rollNo || rollNo}</span>
+                <span><b>Course:</b> {userProfile?.course || course} ({userProfile?.year || year})</span>
+              </div>
             </div>
 
-            <p className="text-xs text-muted-foreground mb-3">Here are the enduring stories from this hunt:</p>
+            <p className="text-xs text-muted-foreground mb-3">Here are the enduring stories from today's hunt:</p>
             <div className="quiz-recap">
               {questions.map(item => (
                 <div key={item.id}>
@@ -398,10 +587,11 @@ function Quiz() {
                 </div>
               ))}
             </div>
+
             <div className="quiz-actions quiz-actions-center mt-6">
-              <Button asChild>
+              <Button asChild size="lg">
                 <Link to="/leaderboard" search={{ day: targetDay }}>
-                  View Leaderboard <Trophy size={14} className="ml-1" />
+                  View Live Leaderboard <Trophy size={14} className="ml-1" />
                 </Link>
               </Button>
               <Button variant="outline" asChild>
