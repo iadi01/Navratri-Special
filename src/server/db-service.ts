@@ -215,6 +215,88 @@ export async function saveUserProfileToMongo(
   }
 }
 
+export async function checkUsernameConflictInMongo(params: {
+  username: string;
+  course?: string;
+  batch?: string;
+  year?: string;
+  rollNo?: string;
+  clientIp?: string;
+}): Promise<{ conflict: boolean; message?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { conflict: false };
+    }
+
+    const cleanUsername = (params.username || '').trim();
+    if (!cleanUsername) return { conflict: false };
+
+    const cleanCourse = (params.course || '').trim();
+    const cleanBatch = (params.batch || '').trim();
+    const cleanYear = (params.year || '').trim();
+    const cleanRollNo = (params.rollNo || '').trim().toUpperCase();
+
+    const escUser = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRegex = new RegExp(`^${escUser}$`, 'i');
+
+    const leaderboardCol = db.collection('leaderboard');
+    const usersCol = db.collection('users');
+
+    const matchConditions: any = {
+      $or: [{ username: nameRegex }, { fullName: nameRegex }],
+    };
+
+    if (cleanCourse) {
+      const escCourse = cleanCourse.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      matchConditions.course = { $regex: new RegExp(`^${escCourse}$`, 'i') };
+    }
+
+    const [existingLeaderboard, existingUsers] = await Promise.all([
+      leaderboardCol.find(matchConditions).toArray(),
+      usersCol.find(matchConditions).toArray(),
+    ]);
+
+    const allMatches = [...existingLeaderboard, ...existingUsers];
+
+    for (const match of allMatches) {
+      const matchBatch = (match.batch || '').trim().toLowerCase();
+      const matchYear = (match.year || '').trim().toLowerCase();
+      const matchRoll = (match.rollNo || '').trim().toUpperCase();
+
+      const sameBatch = cleanBatch && matchBatch && cleanBatch.toLowerCase() === matchBatch;
+      const sameYear = cleanYear && matchYear && cleanYear.toLowerCase() === matchYear;
+
+      // Conflict if in the same semester or batch within this course
+      if (sameBatch || sameYear || (!cleanBatch && !matchBatch && (sameYear || !cleanYear))) {
+        // If both have identical roll number, it is the same student revisiting
+        if (cleanRollNo && matchRoll && cleanRollNo === matchRoll) {
+          continue;
+        }
+
+        // If from the same IP and no conflicting roll number, allow self-edits
+        if (params.clientIp && (match.clientIp === params.clientIp || match.lastIp === params.clientIp)) {
+          if (!cleanRollNo || !matchRoll || cleanRollNo === matchRoll) {
+            continue;
+          }
+        }
+
+        const dept = cleanCourse || 'this course';
+        const sem = matchYear || matchBatch || 'this batch';
+        return {
+          conflict: true,
+          message: `Participant "${cleanUsername}" is already registered in ${dept} (${sem}). To avoid duplicate names on the leaderboard, please use your unique full name or add an initial / roll number (e.g., "${cleanUsername} K.").`,
+        };
+      }
+    }
+
+    return { conflict: false };
+  } catch (err: any) {
+    console.error('Error in checkUsernameConflictInMongo:', err?.message);
+    return { conflict: false };
+  }
+}
+
 export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry[]> {
   try {
     const { db, status } = await connectToDatabase();

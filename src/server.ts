@@ -16,6 +16,7 @@ import {
   saveLiveDaysToMongo,
   checkAttemptInMongo,
   saveUserProfileToMongo,
+  checkUsernameConflictInMongo,
 } from "./server/db-service";
 
 type ServerEntry = {
@@ -87,6 +88,34 @@ export default {
         });
       } catch (err: any) {
         return new Response(JSON.stringify({ attempted: false }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 🔍 Check username conflict in same course & batch
+    if (url.pathname === '/api/users/check-username' && request.method === 'GET') {
+      try {
+        const username = url.searchParams.get('username') || '';
+        const course = url.searchParams.get('course') || '';
+        const batch = url.searchParams.get('batch') || '';
+        const year = url.searchParams.get('year') || '';
+        const rollNo = url.searchParams.get('rollNo') || '';
+        const result = await checkUsernameConflictInMongo({
+          username,
+          course,
+          batch,
+          year,
+          rollNo,
+          clientIp,
+        });
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ conflict: false }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });

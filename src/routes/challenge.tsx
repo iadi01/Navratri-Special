@@ -41,6 +41,7 @@ import {
   getQuizProgress,
   saveQuizProgress,
   clearQuizProgress,
+  readLeaderboardFromStorage,
   type UserProfile,
 } from '@/lib/leaderboard-store';
 
@@ -135,7 +136,7 @@ function Quiz() {
   });
 
   // Submission result state
-  const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean } | null>(null);
+  const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean; streakBonus?: number } | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
@@ -311,6 +312,47 @@ function Quiz() {
       return;
     }
 
+    // Check if another participant in this batch/course already registered with the same name
+    const isSameProfileAsBefore =
+      userProfile?.fullName?.trim().toLowerCase() === cleanName.toLowerCase() &&
+      userProfile?.course === course.trim() &&
+      userProfile?.year === year.trim();
+
+    if (!isSameProfileAsBefore) {
+      try {
+        const checkRes = await fetch(
+          `/api/users/check-username?username=${encodeURIComponent(cleanName)}&course=${encodeURIComponent(course.trim())}&batch=${encodeURIComponent(batch.trim())}&year=${encodeURIComponent(year.trim())}&rollNo=${encodeURIComponent((userProfile?.rollNo || rollNo).trim())}`
+        );
+        if (checkRes.ok) {
+          const conflictData = await checkRes.json();
+          if (conflictData.conflict) {
+            setProfileError(
+              conflictData.message ||
+                `A participant named "${cleanName}" is already registered in ${course} (${year}). To prevent duplicate names on the leaderboard, please use your unique full name or add an initial / roll number.`
+            );
+            return;
+          }
+        }
+      } catch {
+        // Fallback: check local storage leaderboard cache
+        const localCached = readLeaderboardFromStorage();
+        const conflict = localCached.find(
+          e =>
+            (e.fullName?.trim().toLowerCase() === cleanName.toLowerCase() ||
+              e.username.trim().toLowerCase() === cleanName.toLowerCase()) &&
+            e.course?.trim().toLowerCase() === course.trim().toLowerCase() &&
+            (e.year?.trim().toLowerCase() === year.trim().toLowerCase() ||
+              (batch && e.batch?.trim().toLowerCase() === batch.trim().toLowerCase()))
+        );
+        if (conflict) {
+          setProfileError(
+            `A participant named "${cleanName}" is already registered in ${course} (${year}). To prevent duplicate names on the leaderboard, please use your unique full name or add an initial / roll number.`
+          );
+          return;
+        }
+      }
+    }
+
     const res = saveUserProfile({
       fullName: cleanName,
       username: cleanName,
@@ -449,9 +491,17 @@ function Quiz() {
       const currentRoll = (userProfile?.rollNo || rollNo).trim().toUpperCase();
       const currentName = (userProfile?.fullName || playerName).trim();
 
-      // Ensure minimum 10 points participation score so no participant receives 0
-      const finalPoints = Math.max(10, points);
-      const finalFirstTry = Math.max(1, firstTryCount);
+      // No artificial participation points - true score is preserved!
+      const rawPoints = points;
+      const finalFirstTry = firstTryCount;
+
+      // Consecutive streak bonus: If user completed the previous day's quiz, award +2 bonus!
+      let streakBonus = 0;
+      if (targetDay > 1 && isQuizAttempted(targetDay - 1, currentName, currentRoll)) {
+        streakBonus = 2;
+      }
+
+      const finalPoints = rawPoints + streakBonus;
       setPoints(finalPoints);
       setFirstTryCount(finalFirstTry);
 
@@ -469,7 +519,7 @@ function Quiz() {
         totalQuestions: questions.length,
       });
 
-      setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true });
+      setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true, streakBonus });
       return;
     }
 
@@ -780,6 +830,11 @@ function Quiz() {
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted/60 rounded-full text-xs font-semibold">
                 <DiyaIcon size={14} className="text-amber-600" /> Accuracy: <span className="font-mono font-bold">{firstTryCount}/{questions.length}</span>
               </div>
+              {submissionResult?.streakBonus ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 border border-amber-400/40 rounded-full text-xs font-black text-amber-900 dark:text-amber-200">
+                  ⚡ +{submissionResult.streakBonus} Daily Streak Bonus!
+                </div>
+              ) : null}
             </div>
 
             {/* Auto-Saved Confirmation Box */}

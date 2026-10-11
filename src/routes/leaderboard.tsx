@@ -649,7 +649,7 @@ function Leaderboard() {
                     <th className="py-2.5 sm:py-3 px-2 sm:px-4">Player &amp; Course</th>
                     <th className="py-2.5 sm:py-3 px-2 sm:px-4 text-center">Points</th>
                     <th className="py-3 px-4 text-center hidden md:table-cell">Speed</th>
-                    <th className="py-3 px-4 text-center hidden md:table-cell">Accuracy</th>
+                    <th className="py-3 px-4 text-center hidden md:table-cell">Attempt</th>
                     <th className="py-2.5 sm:py-3 px-2 sm:px-4 text-right">Action</th>
                   </tr>
                 </thead>
@@ -739,7 +739,7 @@ function Leaderboard() {
                         </td>
 
                         <td className="py-3.5 px-4 text-center font-mono text-xs text-foreground font-bold hidden md:table-cell">
-                          {entry.firstTryCount}/{entry.totalQuestions} first try
+                          1/1
                         </td>
 
                         <td className="py-2.5 sm:py-3 px-2 sm:px-4 text-right whitespace-nowrap">
