@@ -25,6 +25,8 @@ import {
   Calendar,
   X,
   Zap,
+  Edit3,
+  Save,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,6 +89,21 @@ function AdminPage() {
   const [participants, setParticipants] = useState<OverallLeaderboardEntry[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<OverallLeaderboardEntry | null>(null);
+  const [editingStudent, setEditingStudent] = useState<{
+    id?: string;
+    username: string;
+    fullName: string;
+    course: string;
+    year: string;
+    batch: string;
+    rollNo: string;
+    day: number;
+    points: number;
+    timeSeconds: number;
+    firstTryCount: number;
+  } | null>(null);
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
+  const [studentActionMsg, setStudentActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // New admin form state
   const [newUsername, setNewUsername] = useState('');
@@ -201,6 +218,87 @@ function AdminPage() {
       setAdminList(list);
     } else {
       setAdminActionMsg({ type: 'error', text: res.error || 'Failed to remove admin' });
+    }
+  };
+
+  const handleStartEditStudent = (st: OverallLeaderboardEntry) => {
+    const day1Score = st.dayBreakdown?.[0] || { points: st.totalPoints, timeSeconds: st.totalTimeSeconds, firstTryCount: 3, day: 1 };
+    setEditingStudent({
+      username: st.username,
+      fullName: st.fullName || st.username,
+      course: st.course && st.course !== 'Not specified' ? st.course : 'BCA',
+      year: st.year && st.year !== 'Not specified' ? st.year : '1st Sem',
+      batch: st.batch && st.batch !== 'Not specified' ? st.batch : '',
+      rollNo: st.rollNo !== '-' && st.rollNo !== 'N/A' ? (st.rollNo || '') : '',
+      day: day1Score.day || 1,
+      points: day1Score.points ?? st.totalPoints,
+      timeSeconds: day1Score.timeSeconds ?? st.totalTimeSeconds,
+      firstTryCount: day1Score.firstTryCount ?? 3,
+    });
+    setStudentActionMsg(null);
+  };
+
+  const handleSaveStudentEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setIsSavingStudent(true);
+    setStudentActionMsg(null);
+
+    try {
+      const res = await fetch('/api/admin/update-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editingStudent,
+          points: Number(editingStudent.points),
+          timeSeconds: Number(editingStudent.timeSeconds),
+          firstTryCount: Number(editingStudent.firstTryCount),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStudentActionMsg({ type: 'success', text: `Score and details for "${editingStudent.fullName}" successfully updated in database!` });
+        await syncLeaderboardWithServer();
+        setParticipants(getOverallLeaderboard());
+        setEditingStudent(null);
+        if (selectedStudent?.username === editingStudent.username) {
+          setSelectedStudent(null);
+        }
+      } else {
+        setStudentActionMsg({ type: 'error', text: data.error || 'Failed to update student score.' });
+      }
+    } catch (err: any) {
+      setStudentActionMsg({ type: 'error', text: err?.message || 'Network error updating student score.' });
+    } finally {
+      setIsSavingStudent(false);
+    }
+  };
+
+  const handleDeleteStudent = async (st: OverallLeaderboardEntry) => {
+    const confirmName = st.fullName || st.username;
+    if (!window.confirm(`Are you sure you want to permanently delete "${confirmName}" from the leaderboard and database? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/delete-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: st.username, deleteUser: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await syncLeaderboardWithServer();
+        setParticipants(getOverallLeaderboard());
+        if (selectedStudent?.username === st.username) {
+          setSelectedStudent(null);
+        }
+        setStudentActionMsg({ type: 'success', text: `Participant "${confirmName}" permanently deleted from leaderboard.` });
+      } else {
+        alert(data.error || 'Failed to delete student.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Network error deleting student.');
     }
   };
 
@@ -615,6 +713,28 @@ function AdminPage() {
               </div>
             </div>
 
+            {studentActionMsg && (
+              <div
+                className={`p-3 rounded-lg text-xs mb-4 flex items-center justify-between border ${
+                  studentActionMsg.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                    : 'bg-destructive/10 text-destructive border-destructive/20'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {studentActionMsg.type === 'success' ? <CheckCircle2 size={15} /> : <ShieldAlert size={15} />}
+                  <span>{studentActionMsg.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStudentActionMsg(null)}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
             {/* Students Table */}
             <div className="overflow-x-auto border border-border rounded-xl">
               <table className="w-full text-left border-collapse text-xs md:text-sm">
@@ -671,18 +791,42 @@ function AdminPage() {
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="h-7 text-xs px-2.5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedStudent(st);
-                          }}
-                        >
-                          View Details <ArrowRight size={12} className="ml-1" />
-                        </Button>
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 text-xs px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedStudent(st);
+                            }}
+                          >
+                            <Eye size={12} className="mr-1" /> View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs px-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEditStudent(st);
+                            }}
+                          >
+                            <Edit3 size={12} className="mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-7 text-xs px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteStudent(st);
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -776,12 +920,195 @@ function AdminPage() {
               </div>
             </div>
 
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 font-bold text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+                onClick={() => {
+                  handleStartEditStudent(selectedStudent);
+                }}
+              >
+                <Edit3 size={14} /> Edit Score / Marks
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 font-bold text-xs gap-1.5"
+                onClick={() => {
+                  handleDeleteStudent(selectedStudent);
+                }}
+              >
+                <Trash2 size={14} /> Delete Participant
+              </Button>
+            </div>
+
             <Button
-              className="w-full font-bold"
+              variant="secondary"
+              className="w-full font-bold text-xs"
               onClick={() => setSelectedStudent(null)}
             >
               Close Profile
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT STUDENT & MARKS MODAL (MAIN ADMIN ONLY) */}
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b border-border pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Edit3 size={18} className="text-primary" /> Edit Participant &amp; Score
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Update marks/points, speed, and academic details for @{editingStudent.username}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full"
+                onClick={() => setEditingStudent(null)}
+              >
+                <X size={16} />
+              </Button>
+            </div>
+
+            <form onSubmit={handleSaveStudentEdit} className="space-y-3.5">
+              <div className="space-y-1">
+                <Label htmlFor="edit-fullname" className="text-xs font-semibold">Full Name *</Label>
+                <Input
+                  id="edit-fullname"
+                  value={editingStudent.fullName}
+                  onChange={e => setEditingStudent({ ...editingStudent, fullName: e.target.value })}
+                  className="h-9 text-xs"
+                  required
+                />
+              </div>
+
+              {/* Score / Marks & Time Prominent Inputs */}
+              <div className="grid grid-cols-3 gap-2.5 bg-primary/5 p-3 rounded-xl border border-primary/20">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-points" className="text-xs font-bold text-primary">Score (Points) *</Label>
+                  <Input
+                    id="edit-points"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editingStudent.points}
+                    onChange={e => setEditingStudent({ ...editingStudent, points: Number(e.target.value) })}
+                    className="h-9 text-sm font-black text-primary font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-time" className="text-xs font-bold text-emerald-600">Speed (Seconds)</Label>
+                  <Input
+                    id="edit-time"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={editingStudent.timeSeconds}
+                    onChange={e => setEditingStudent({ ...editingStudent, timeSeconds: Number(e.target.value) })}
+                    className="h-9 text-xs font-mono font-bold"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-firsttry" className="text-xs font-bold text-muted-foreground">Attempts (1-3)</Label>
+                  <select
+                    id="edit-firsttry"
+                    value={editingStudent.firstTryCount}
+                    onChange={e => setEditingStudent({ ...editingStudent, firstTryCount: Number(e.target.value) })}
+                    className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs h-9 font-mono"
+                  >
+                    <option value="3">3/3</option>
+                    <option value="2">2/3</option>
+                    <option value="1">1/3</option>
+                    <option value="0">0/3</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Academic Info Inputs */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-course" className="text-xs font-semibold">Course / Degree</Label>
+                  <select
+                    id="edit-course"
+                    value={editingStudent.course}
+                    onChange={e => setEditingStudent({ ...editingStudent, course: e.target.value })}
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs h-9"
+                  >
+                    <option value="BBA">BBA</option>
+                    <option value="BCA">BCA</option>
+                    <option value="MBA">MBA</option>
+                    <option value="MCA">MCA</option>
+                    <option value="BA">BA</option>
+                    <option value="BAJMC">BAJMC</option>
+                    <option value="BCOM">BCOM</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-year" className="text-xs font-semibold">Semester</Label>
+                  <select
+                    id="edit-year"
+                    value={editingStudent.year}
+                    onChange={e => setEditingStudent({ ...editingStudent, year: e.target.value })}
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs h-9"
+                  >
+                    <option value="1st Sem">1st Sem</option>
+                    <option value="2nd Sem">2nd Sem</option>
+                    <option value="3rd Sem">3rd Sem</option>
+                    <option value="4th Sem">4th Sem</option>
+                    <option value="5th Sem">5th Sem</option>
+                    <option value="6th Sem">6th Sem</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-batch" className="text-xs font-semibold">Batch</Label>
+                  <Input
+                    id="edit-batch"
+                    placeholder="e.g. 2025-28 / Batch G"
+                    value={editingStudent.batch}
+                    onChange={e => setEditingStudent({ ...editingStudent, batch: e.target.value })}
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-roll" className="text-xs font-semibold">Roll No / Student ID</Label>
+                  <Input
+                    id="edit-roll"
+                    placeholder="Optional"
+                    value={editingStudent.rollNo}
+                    onChange={e => setEditingStudent({ ...editingStudent, rollNo: e.target.value })}
+                    className="h-9 text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-1/3 text-xs"
+                  onClick={() => setEditingStudent(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSavingStudent}
+                  className="w-2/3 text-xs font-bold gap-1.5 shadow-xs"
+                >
+                  <Save size={14} /> {isSavingStudent ? 'Saving to Database...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

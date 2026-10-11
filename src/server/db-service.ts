@@ -617,3 +617,117 @@ export async function saveLiveDaysToMongo(days: number[]): Promise<boolean> {
     return false;
   }
 }
+
+export async function updateScoreInMongo(params: {
+  id?: string;
+  username?: string;
+  day?: number;
+  points?: number;
+  timeSeconds?: number;
+  firstTryCount?: number;
+  fullName?: string;
+  course?: string;
+  year?: string;
+  batch?: string;
+  rollNo?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { success: false, error: 'Database not connected.' };
+    }
+
+    const leaderboardCol = db.collection('leaderboard');
+    const usersCol = db.collection('users');
+
+    const filter: any = {};
+    if (params.id) {
+      filter.$or = [{ id: params.id }, { _id: params.id }];
+    } else if (params.username) {
+      const esc = params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.username = { $regex: new RegExp(`^${esc}$`, 'i') };
+      if (params.day) filter.day = Number(params.day);
+    }
+
+    const existing = await leaderboardCol.findOne(filter);
+    if (!existing) {
+      return { success: false, error: 'Score record not found.' };
+    }
+
+    const updateFields: any = {
+      updatedAt: new Date(),
+    };
+    if (typeof params.points === 'number') updateFields.points = Number(params.points);
+    if (typeof params.timeSeconds === 'number') updateFields.timeSeconds = Number(params.timeSeconds);
+    if (typeof params.firstTryCount === 'number') updateFields.firstTryCount = Number(params.firstTryCount);
+    if (params.fullName) updateFields.fullName = params.fullName.trim();
+    if (params.course) updateFields.course = params.course.trim();
+    if (params.year) updateFields.year = params.year.trim();
+    if (params.batch !== undefined) updateFields.batch = params.batch.trim();
+    if (params.rollNo !== undefined) updateFields.rollNo = params.rollNo.trim().toUpperCase();
+
+    await leaderboardCol.updateOne({ _id: existing._id }, { $set: updateFields });
+
+    // Also update users collection for profile consistency
+    const cleanUser = (existing.username || params.username || '').toLowerCase();
+    if (cleanUser) {
+      const userUpdate: any = { updatedAt: new Date() };
+      if (params.fullName) userUpdate.fullName = params.fullName.trim();
+      if (params.course) userUpdate.course = params.course.trim();
+      if (params.year) userUpdate.year = params.year.trim();
+      if (params.batch !== undefined) userUpdate.batch = params.batch.trim();
+      if (params.rollNo !== undefined) userUpdate.rollNo = params.rollNo.trim().toUpperCase();
+      await usersCol.updateOne({ username: cleanUser }, { $set: userUpdate });
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to update score.' };
+  }
+}
+
+export async function deleteScoreInMongo(params: {
+  id?: string;
+  username?: string;
+  day?: number;
+  deleteUser?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { success: false, error: 'Database not connected.' };
+    }
+
+    const leaderboardCol = db.collection('leaderboard');
+    const usersCol = db.collection('users');
+
+    const filter: any = {};
+    if (params.id) {
+      filter.$or = [{ id: params.id }, { _id: params.id }];
+    } else if (params.username) {
+      const esc = params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.username = { $regex: new RegExp(`^${esc}$`, 'i') };
+      if (params.day) filter.day = Number(params.day);
+    }
+
+    const existing = await leaderboardCol.findOne(filter);
+    if (existing) {
+      await leaderboardCol.deleteOne({ _id: existing._id });
+    }
+
+    const uName = existing?.username || params.username;
+    if (uName && params.deleteUser) {
+      const esc = uName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      await usersCol.deleteMany({
+        $or: [
+          { username: { $regex: new RegExp(`^${esc}$`, 'i') } },
+          { fullName: { $regex: new RegExp(`^${esc}$`, 'i') } }
+        ]
+      });
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to delete record.' };
+  }
+}

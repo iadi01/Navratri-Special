@@ -25,6 +25,7 @@ import {
   getLeaderboardEntries,
   getOverallLeaderboard,
   syncLeaderboardWithServer,
+  getSavedUserProfile,
   type LeaderboardEntry,
   type OverallLeaderboardEntry,
 } from '@/lib/leaderboard-store';
@@ -159,6 +160,34 @@ function Leaderboard() {
         e.course?.toLowerCase().includes(q)
     );
   }, [dailyList, searchQuery]);
+
+  const currentUserDayEntry = useMemo(() => {
+    const profile = getSavedUserProfile();
+    if (!profile) return null;
+    const cleanRoll = (profile.rollNo || '').trim().toUpperCase();
+    const cleanName = (profile.fullName || profile.username || '').trim().toLowerCase();
+    if (!cleanRoll && !cleanName) return null;
+    return (
+      dailyList.find(e => {
+        const eRoll = (e.rollNo || '').trim().toUpperCase();
+        const eName = (e.fullName || e.username || '').trim().toLowerCase();
+        return (cleanRoll && eRoll === cleanRoll) || (cleanName && eName === cleanName);
+      }) || null
+    );
+  }, [dailyList]);
+
+  const userDayRank = useMemo(() => {
+    if (!currentUserDayEntry) return 0;
+    const idx = dailyList.findIndex(e => e.id === currentUserDayEntry.id);
+    return idx >= 0 ? idx + 1 : 0;
+  }, [dailyList, currentUserDayEntry]);
+
+  const currentDayUserBest = useMemo(() => {
+    if (currentUserDayEntry) {
+      return Math.max(currentUserDayEntry.points, userBest);
+    }
+    return userBest;
+  }, [currentUserDayEntry, userBest]);
 
   const currentQuiz = DAILY_QUIZZES.find(q => q.day === selectedDay) || DAILY_QUIZZES[0];
 
@@ -595,30 +624,42 @@ function Leaderboard() {
           </div>
 
           {/* User Personal Best for this day */}
-          {userBest > 0 && (
+          {currentDayUserBest > 0 && (
             <div className="quiz-best-band flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <DiyaIcon size={16} className="text-amber-600 inline" />
-                <span>Day {String(selectedDay).padStart(2, '0')} Personal Best:</span>
-                <strong>{userBest} pts</strong>
+                <span className="font-bold">Day {String(selectedDay).padStart(2, '0')} Personal Best:</span>
+                <span className="font-black text-primary px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-xs sm:text-sm">
+                  {currentDayUserBest} pts
+                </span>
+                {currentUserDayEntry && (
+                  <span className="text-xs text-muted-foreground font-mono font-bold flex items-center gap-1.5 ml-1">
+                    • ⚡ {currentUserDayEntry.timeSeconds}s
+                    {userDayRank > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-foreground font-sans">
+                        Rank #{userDayRank}
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  const found = dailyList.find(e => e.points === userBest) || {
-                    points: userBest,
-                    fullName: 'Player',
-                    username: 'player',
+                  const entryToShare = currentUserDayEntry || {
+                    points: currentDayUserBest,
+                    fullName: getSavedUserProfile()?.fullName || 'Participant',
+                    username: getSavedUserProfile()?.username || 'participant',
                     timeSeconds: 0,
                     firstTryCount: 3,
                     totalQuestions: 3,
                   };
-                  handleOpenShare(found, 1, selectedDay);
+                  handleOpenShare(entryToShare, userDayRank || 1, selectedDay);
                 }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
               >
-                <Share2 size={11} className="text-primary shrink-0" />
-                <span>Share</span>
+                <Share2 size={12} className="text-primary shrink-0" />
+                <span>Share My Scorecard</span>
               </button>
             </div>
           )}

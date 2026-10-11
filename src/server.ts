@@ -17,6 +17,8 @@ import {
   checkAttemptInMongo,
   saveUserProfileToMongo,
   checkUsernameConflictInMongo,
+  updateScoreInMongo,
+  deleteScoreInMongo,
 } from "./server/db-service";
 
 type ServerEntry = {
@@ -257,6 +259,40 @@ export default {
         });
       } catch (err: any) {
         return new Response(JSON.stringify({ success: false, error: err?.message || 'Failed to delete admin' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 👑 Update user score / marks and details (Main Admin)
+    if (url.pathname === '/api/admin/update-score' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const res = await updateScoreInMongo(body);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 👑 Delete user / score record (Main Admin)
+    if (url.pathname === '/api/admin/delete-score' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const res = await deleteScoreInMongo(body);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message }), {
           status: 500,
           headers: { 'content-type': 'application/json' },
         });
