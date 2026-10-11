@@ -78,8 +78,9 @@ export default {
     if (url.pathname === '/api/check-attempt' && request.method === 'GET') {
       try {
         const day = Number(url.searchParams.get('day') || 1);
-        const identifier = url.searchParams.get('username') || url.searchParams.get('rollNo') || undefined;
-        const result = await checkAttemptInMongo(day, identifier, clientIp);
+        const username = url.searchParams.get('username') || undefined;
+        const rollNo = url.searchParams.get('rollNo') || undefined;
+        const result = await checkAttemptInMongo(day, username, rollNo, clientIp);
         return new Response(JSON.stringify(result), {
           status: 200,
           headers: { 'content-type': 'application/json' },

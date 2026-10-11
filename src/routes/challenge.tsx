@@ -122,9 +122,17 @@ function Quiz() {
   const [batch, setBatch] = useState(() => userProfile?.batch || '');
   const [rollNo, setRollNo] = useState(() => userProfile?.rollNo || '');
 
-  // 1-Attempt Security Check state
-  const [hasAttemptedToday, setHasAttemptedToday] = useState(false);
+  // 1-Attempt Security Check state (Synchronous initialization from local cache)
+  const [hasAttemptedToday, setHasAttemptedToday] = useState(() => {
+    const profile = getSavedUserProfile();
+    return isQuizAttempted(targetDay, profile?.fullName || profile?.username, profile?.rollNo);
+  });
   const [attemptReason, setAttemptReason] = useState<string | null>(null);
+  const [isVerifyingAttempt, setIsVerifyingAttempt] = useState(() => {
+    const profile = getSavedUserProfile();
+    const already = isQuizAttempted(targetDay, profile?.fullName || profile?.username, profile?.rollNo);
+    return !already;
+  });
 
   // Submission result state
   const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean } | null>(null);
@@ -155,59 +163,102 @@ function Quiz() {
 
     const profile = getSavedUserProfile();
     setUserProfile(profile);
+    const candidateName = profile?.fullName || profile?.username || '';
+    const candidateRoll = profile?.rollNo || '';
+
     if (profile) {
-      setPlayerName(profile.fullName || profile.username || '');
+      setPlayerName(candidateName);
       setCourse(profile.course || 'BCA');
       setYear(profile.year || '1st Sem');
       setBatch(profile.batch || '');
-      setRollNo(profile.rollNo || '');
+      setRollNo(candidateRoll);
       setIsEditingProfile(!profile.fullName);
     } else {
       setIsEditingProfile(true);
     }
 
-    // Authoritative check with server/MongoDB
-    const candidateName = profile?.fullName || profile?.username;
-    if (candidateName) {
-      checkServerAttempt(targetDay, candidateName).then((res) => {
-        if (res.attempted) {
-          setHasAttemptedToday(true);
-          setAttemptReason(res.reason || `Day ${targetDay} has already been completed.`);
-          clearQuizProgress(targetDay);
-        } else {
-          setHasAttemptedToday(false);
-          setAttemptReason(null);
+    // 1. Synchronous local check to immediately prevent question/start flashing
+    const locallyAttempted = isQuizAttempted(targetDay, candidateName, candidateRoll);
+    if (locallyAttempted) {
+      setHasAttemptedToday(true);
+      setAttemptReason(`Day ${targetDay} quiz has already been completed. Only 1 attempt is counted.`);
+      clearQuizProgress(targetDay);
+      setIsVerifyingAttempt(false);
 
-          // Resume progress if user left halfway
-          const savedProgress = getQuizProgress(targetDay);
-          if (savedProgress && savedProgress.index < questions.length) {
-            setStarted(true);
-            setIndex(savedProgress.index);
-            setPoints(savedProgress.points || 0);
-            setFirstTryCount(savedProgress.firstTryCount || 0);
-            const elapsed = savedProgress.elapsedSeconds || 0;
-            setTimeTaken(elapsed);
-            startTimeRef.current = Date.now() - (elapsed * 1000);
-          }
+      // Restore saved local score if available for scorecard sharing
+      try {
+        const rawAttempt = localStorage.getItem(`pehchaan_quiz_attempt_day_${targetDay}`);
+        if (rawAttempt) {
+          const parsed = JSON.parse(rawAttempt);
+          if (parsed?.score?.points !== undefined) setPoints(parsed.score.points);
+          if (parsed?.score?.timeSeconds !== undefined) setTimeTaken(parsed.score.timeSeconds);
+          if (parsed?.score?.rank !== undefined) setSubmissionResult({ submitted: true, rank: parsed.score.rank });
         }
-      });
+      } catch {}
     } else {
-      setHasAttemptedToday(false);
-      setAttemptReason(null);
-      const savedProgress = getQuizProgress(targetDay);
-      if (savedProgress && savedProgress.index < questions.length) {
-        setStarted(true);
-        setIndex(savedProgress.index);
-        setPoints(savedProgress.points || 0);
-        setFirstTryCount(savedProgress.firstTryCount || 0);
-        const elapsed = savedProgress.elapsedSeconds || 0;
-        setTimeTaken(elapsed);
-        startTimeRef.current = Date.now() - (elapsed * 1000);
+      setIsVerifyingAttempt(true);
+    }
+
+    // 2. Authoritative check with server/MongoDB
+    if (candidateName || candidateRoll) {
+      checkServerAttempt(targetDay, candidateName, candidateRoll)
+        .then((res) => {
+          setIsVerifyingAttempt(false);
+          if (res.attempted) {
+            setHasAttemptedToday(true);
+            setAttemptReason(res.reason || `Day ${targetDay} quiz has already been completed.`);
+            clearQuizProgress(targetDay);
+            setStarted(false);
+
+            if (res.existingScore) {
+              if (typeof res.existingScore.points === 'number') setPoints(res.existingScore.points);
+              if (typeof res.existingScore.timeSeconds === 'number') setTimeTaken(res.existingScore.timeSeconds);
+              if (typeof res.existingScore.firstTryCount === 'number') setFirstTryCount(res.existingScore.firstTryCount);
+              if (typeof res.existingScore.rank === 'number') setSubmissionResult({ submitted: true, rank: res.existingScore.rank });
+            }
+          } else {
+            // Server confirms NOT attempted: verify local cache didn't have lock
+            if (!isQuizAttempted(targetDay, candidateName, candidateRoll)) {
+              setHasAttemptedToday(false);
+              setAttemptReason(null);
+
+              // Resume progress ONLY if quiz was truly left halfway
+              const savedProgress = getQuizProgress(targetDay);
+              if (savedProgress && savedProgress.index < questions.length) {
+                setStarted(true);
+                setIndex(savedProgress.index);
+                setPoints(savedProgress.points || 0);
+                setFirstTryCount(savedProgress.firstTryCount || 0);
+                const elapsed = savedProgress.elapsedSeconds || 0;
+                setTimeTaken(elapsed);
+                startTimeRef.current = Date.now() - (elapsed * 1000);
+              }
+            }
+          }
+        })
+        .catch(() => {
+          setIsVerifyingAttempt(false);
+        });
+    } else {
+      setIsVerifyingAttempt(false);
+      // New visitor: resume halfway progress if exists and not attempted
+      if (!isQuizAttempted(targetDay)) {
+        const savedProgress = getQuizProgress(targetDay);
+        if (savedProgress && savedProgress.index < questions.length) {
+          setStarted(true);
+          setIndex(savedProgress.index);
+          setPoints(savedProgress.points || 0);
+          setFirstTryCount(savedProgress.firstTryCount || 0);
+          const elapsed = savedProgress.elapsedSeconds || 0;
+          setTimeTaken(elapsed);
+          startTimeRef.current = Date.now() - (elapsed * 1000);
+        }
       }
     }
   }, [targetDay]);
 
   const launchQuiz = () => {
+    if (hasAttemptedToday || isVerifyingAttempt) return;
     const saved = getQuizProgress(targetDay);
     if (saved && saved.index < questions.length) {
       setStarted(true);
@@ -278,16 +329,18 @@ function Quiz() {
 
     // Verify if this participant has already attempted today
     try {
-      const attemptRes = await checkServerAttempt(targetDay, cleanName);
+      const attemptRes = await checkServerAttempt(targetDay, cleanName, res.profile.rollNo);
       if (attemptRes.attempted) {
         setHasAttemptedToday(true);
         setAttemptReason(attemptRes.reason || `Participant ${cleanName} has already completed Day ${targetDay} quiz.`);
+        clearQuizProgress(targetDay);
         return;
       }
     } catch {
-      if (isQuizAttempted(targetDay, cleanName)) {
+      if (isQuizAttempted(targetDay, cleanName, res.profile.rollNo)) {
         setHasAttemptedToday(true);
         setAttemptReason(`Participant ${cleanName} has already completed Day ${targetDay} quiz.`);
+        clearQuizProgress(targetDay);
         return;
       }
     }
@@ -306,7 +359,7 @@ function Quiz() {
       return;
     }
 
-    if (hasAttemptedToday) {
+    if (hasAttemptedToday || isVerifyingAttempt) {
       return;
     }
 
@@ -458,7 +511,7 @@ function Quiz() {
     );
   }
 
-  if (!started) {
+  if (!started || hasAttemptedToday) {
     return (
       <main className="wrap section">
         <div className="quiz">
@@ -487,16 +540,30 @@ function Quiz() {
                 <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
                   {attemptReason || 'Only 1 attempt per day is allowed per student to ensure 100% fair leaderboard rankings.'}
                 </p>
-                <div className="pt-2 flex justify-center gap-2">
+                <div className="pt-2 flex flex-wrap justify-center gap-2">
                   <Button asChild>
                     <Link to="/leaderboard" search={{ day: targetDay }}>
                       View Today's Leaderboard <Trophy size={14} className="ml-1.5" />
                     </Link>
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="font-bold cursor-pointer"
+                    onClick={() => setIsShareModalOpen(true)}
+                  >
+                    <Share2 size={14} className="mr-1.5" /> Share Scorecard
+                  </Button>
                   <Button variant="outline" asChild>
                     <Link to="/heroines">Hall of Heroines</Link>
                   </Button>
                 </div>
+              </div>
+            ) : isVerifyingAttempt ? (
+              <div className="bg-card border border-border rounded-xl p-8 my-5 max-w-lg mx-auto text-center space-y-3 shadow-xs animate-in fade-in">
+                <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xs text-muted-foreground font-semibold">
+                  Checking quiz status &amp; verifying attempt...
+                </p>
               </div>
             ) : (
               /* PARTICIPANT DETAILS & START SECTION */
@@ -656,6 +723,25 @@ function Quiz() {
                   </div>
                 )}
               </div>
+            )}
+
+            {hasAttemptedToday && (
+              <ShareCardModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                day={targetDay}
+                dayTitle={currentQuiz.title}
+                points={points}
+                maxPoints={maxPoints}
+                timeTaken={timeTaken}
+                firstTryCount={firstTryCount}
+                totalQuestions={questions.length}
+                rank={submissionResult?.rank || 1}
+                fullName={userProfile?.fullName || playerName}
+                course={userProfile?.course || course}
+                year={userProfile?.year || year}
+                tier={points >= maxPoints ? 'Herstory Champion' : points >= 20 ? 'Curiosity Star' : 'Brave Explorer'}
+              />
             )}
           </div>
         </div>

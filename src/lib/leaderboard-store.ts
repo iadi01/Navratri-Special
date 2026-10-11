@@ -145,13 +145,41 @@ export function saveUserProfile(profile: Partial<UserProfile>): { success: boole
 // 🛡️ 1-ATTEMPT PER DAY VERIFICATION (Client + Server sync)
 // ---------------------------------------------------------------------------
 
-export function isQuizAttempted(day: number, identifier?: string): boolean {
+export function isQuizAttempted(day: number, identifier?: string, rollNo?: string): boolean {
   if (typeof window === 'undefined') return false;
   try {
+    // 1. Device/Browser day-level lock (set when quiz is submitted)
+    if (localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`)) {
+      return true;
+    }
+
+    // 2. Specific username / candidate lock
     const cleanId = identifier ? identifier.trim().toLowerCase() : '';
     if (cleanId && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanId}`)) {
       return true;
     }
+
+    // 3. RollNo lock
+    const cleanRoll = rollNo ? rollNo.trim().toUpperCase() : '';
+    if (cleanRoll && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanRoll.toLowerCase()}`)) {
+      return true;
+    }
+
+    // 4. Cached leaderboard records check
+    const cached = readLeaderboardFromStorage();
+    if (Array.isArray(cached)) {
+      const match = cached.find(e =>
+        e.day === day && (
+          (cleanId && (
+            e.username.trim().toLowerCase() === cleanId ||
+            (e.fullName && e.fullName.trim().toLowerCase() === cleanId)
+          )) ||
+          (cleanRoll && e.rollNo && e.rollNo.trim().toUpperCase() === cleanRoll)
+        )
+      );
+      if (match) return true;
+    }
+
     return false;
   } catch {
     return false;
@@ -175,26 +203,28 @@ export function markQuizAttempted(day: number, identifier?: string, scoreInfo?: 
   } catch {}
 }
 
-export async function checkServerAttempt(day: number, identifier?: string): Promise<{ attempted: boolean; existingScore?: any }> {
+export async function checkServerAttempt(
+  day: number,
+  identifier?: string,
+  rollNo?: string
+): Promise<{ attempted: boolean; reason?: string; existingScore?: any }> {
   if (typeof window === 'undefined') return { attempted: false };
   try {
-    const cleanId = identifier ? encodeURIComponent(identifier.trim().toLowerCase()) : '';
-    const res = await fetch(`/api/check-attempt?day=${day}&username=${cleanId}`);
+    const cleanUser = identifier ? encodeURIComponent(identifier.trim()) : '';
+    const cleanRoll = rollNo ? encodeURIComponent(rollNo.trim()) : '';
+    const res = await fetch(`/api/check-attempt?day=${day}&username=${cleanUser}&rollNo=${cleanRoll}`);
     if (res.ok) {
       const data = await res.json();
       if (data.attempted) {
         markQuizAttempted(day, identifier, data.existingScore);
-      } else {
-        // Authoritative Server says not attempted: clear any stale local locks
-        localStorage.removeItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`);
-        if (identifier) {
-          localStorage.removeItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${identifier.trim().toLowerCase()}`);
+        if (rollNo) {
+          markQuizAttempted(day, rollNo, data.existingScore);
         }
       }
       return data;
     }
   } catch {}
-  return { attempted: isQuizAttempted(day, identifier) };
+  return { attempted: isQuizAttempted(day, identifier, rollNo) };
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +329,27 @@ export function sortLeaderboard(entries: LeaderboardEntry[]): LeaderboardEntry[]
 export function getLeaderboardEntries(day?: number): LeaderboardEntry[] {
   const all = readLeaderboardFromStorage();
   const filtered = day ? all.filter(e => e.day === day) : all;
-  return sortLeaderboard(filtered);
+
+  // Deduplicate strictly by student: Keep ONLY the authentic 1st attempt!
+  const firstAttempts = new Map<string, LeaderboardEntry>();
+
+  // Sort chronologically EARLIEST first so the very first attempt is processed first
+  const chrono = [...filtered].sort(
+    (a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
+  );
+
+  for (const entry of chrono) {
+    const cleanRoll = (entry.rollNo || '').trim().toUpperCase();
+    const cleanName = (entry.fullName || entry.username || '').trim().toLowerCase();
+    const userKey = cleanRoll ? `roll_${cleanRoll}` : `name_${cleanName}`;
+    const compositeKey = `day_${entry.day}_${userKey}`;
+
+    if (!firstAttempts.has(compositeKey)) {
+      firstAttempts.set(compositeKey, entry);
+    }
+  }
+
+  return sortLeaderboard(Array.from(firstAttempts.values()));
 }
 
 export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
@@ -316,8 +366,16 @@ export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
     lastActive: string;
   }>();
 
-  for (const entry of all) {
-    const key = entry.username.trim().toLowerCase();
+  // Sort chronologically EARLIEST first so each student's first attempt is locked in
+  const chrono = [...all].sort(
+    (a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
+  );
+
+  for (const entry of chrono) {
+    const cleanRoll = (entry.rollNo || '').trim().toUpperCase();
+    const cleanName = (entry.fullName || entry.username || '').trim().toLowerCase();
+    const key = cleanRoll ? `roll_${cleanRoll}` : `name_${cleanName}`;
+
     if (!userMap.has(key)) {
       userMap.set(key, {
         username: entry.username.trim(),
@@ -339,13 +397,8 @@ export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
     if (entry.rollNo && !userRec.rollNo) userRec.rollNo = entry.rollNo;
     if (entry.email && !userRec.email) userRec.email = entry.email;
 
-    const existingForDay = userRec.dayScores.get(entry.day);
-
-    if (
-      !existingForDay ||
-      entry.points > existingForDay.points ||
-      (entry.points === existingForDay.points && entry.timeSeconds < existingForDay.timeSeconds)
-    ) {
+    // 🔒 STRICT: ONLY COUNT THE FIRST ATTEMPT FOR THIS DAY! Do not overwrite with attempt 2 or 3!
+    if (!userRec.dayScores.has(entry.day)) {
       userRec.dayScores.set(entry.day, entry);
     }
 
@@ -425,15 +478,36 @@ export function submitLeaderboardScore(params: {
 }): { success: boolean; entry: LeaderboardEntry; rank: number } {
   const all = readLeaderboardFromStorage();
   const cleanUsername = params.username.trim() || 'Anonymous Explorer';
+  const cleanFullName = params.fullName?.trim() || cleanUsername;
+  const cleanRollNo = (params.rollNo || '').trim().toUpperCase();
+
+  // Check if an attempt already exists in local storage
+  const existingEntry = all.find(e =>
+    e.day === params.day && (
+      (cleanRollNo && e.rollNo && e.rollNo.trim().toUpperCase() === cleanRollNo) ||
+      (e.username.trim().toLowerCase() === cleanUsername.toLowerCase()) ||
+      (e.fullName && e.fullName.trim().toLowerCase() === cleanFullName.toLowerCase())
+    )
+  );
+
+  if (existingEntry) {
+    const dayLeaderboard = getLeaderboardEntries(params.day);
+    const rank = dayLeaderboard.findIndex(e => e.id === existingEntry.id) + 1;
+    return {
+      success: false,
+      entry: existingEntry,
+      rank: rank > 0 ? rank : 1,
+    };
+  }
 
   const newEntry: LeaderboardEntry = {
     id: `entry-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     username: cleanUsername,
-    fullName: params.fullName?.trim() || cleanUsername,
+    fullName: cleanFullName,
     course: params.course?.trim() || '',
     year: params.year?.trim() || '',
     batch: params.batch?.trim() || '',
-    rollNo: params.rollNo?.trim() || '',
+    rollNo: cleanRollNo,
     email: params.email?.trim() || '',
     day: params.day,
     points: params.points,
@@ -446,15 +520,22 @@ export function submitLeaderboardScore(params: {
   const updated = [...all, newEntry];
   writeLeaderboardToStorage(updated);
 
-  const dayLeaderboard = sortLeaderboard(updated.filter(e => e.day === params.day));
+  const dayLeaderboard = getLeaderboardEntries(params.day);
   const rank = dayLeaderboard.findIndex(e => e.id === newEntry.id) + 1;
   const finalRank = rank > 0 ? rank : 1;
 
-  markQuizAttempted(params.day, params.fullName || params.username || params.rollNo, {
+  markQuizAttempted(params.day, cleanFullName || cleanUsername, {
     points: params.points,
     timeSeconds: Number(params.timeSeconds.toFixed(1)),
     rank: finalRank,
   });
+  if (cleanRollNo) {
+    markQuizAttempted(params.day, cleanRollNo, {
+      points: params.points,
+      timeSeconds: Number(params.timeSeconds.toFixed(1)),
+      rank: finalRank,
+    });
+  }
 
   if (typeof window !== 'undefined') {
     fetch('/api/scores', {

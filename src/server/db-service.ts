@@ -12,68 +12,80 @@ export async function saveScoreToMongo(
     }
 
     const leaderboardCol = db.collection('leaderboard');
-    const cleanRollNo = (entry.rollNo || '').trim().toUpperCase();
     const cleanDay = Number(entry.day);
+    const cleanRollNo = (entry.rollNo || '').trim().toUpperCase();
+    const cleanUsername = (entry.username || '').trim();
+    const cleanFullName = (entry.fullName || entry.username || '').trim();
 
-    // 🛡️ 1-Attempt Security Check: Check if this roll number already submitted for this day
+    // 🛡️ STRICT 1-ATTEMPT SECURITY CHECK:
+    // Check if this participant already submitted ANY attempt for this day (by rollNo, username, or fullName)
+    const checkConditions: any[] = [];
     if (cleanRollNo) {
+      checkConditions.push({ rollNo: cleanRollNo });
+    }
+    if (cleanUsername) {
+      const escUser = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      checkConditions.push({ username: { $regex: new RegExp(`^${escUser}$`, 'i') } });
+    }
+    if (cleanFullName) {
+      const escFull = cleanFullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      checkConditions.push({ fullName: { $regex: new RegExp(`^${escFull}$`, 'i') } });
+    }
+
+    if (checkConditions.length > 0) {
       const existing = await leaderboardCol.findOne({
         day: cleanDay,
-        rollNo: cleanRollNo,
+        $or: checkConditions,
       });
 
-      if (existing && existing.id !== entry.id) {
+      if (existing) {
         return {
           success: false,
-          error: `Day ${cleanDay} quiz has already been submitted for Roll No: ${cleanRollNo}. Only 1 attempt per day is allowed.`,
+          error: `Day ${cleanDay} has already been completed by ${cleanFullName || cleanUsername}. Only 1 attempt per day is allowed to maintain fair leaderboard integrity.`,
         };
       }
     }
 
-    // 1. Save or update score entry in leaderboard collection with IP
-    await leaderboardCol.updateOne(
-      { id: entry.id },
-      {
-        $set: {
-          id: entry.id,
-          username: entry.username.trim(),
-          fullName: entry.fullName?.trim() || entry.username.trim(),
-          course: entry.course?.trim() || '',
-          year: entry.year?.trim() || '',
-          batch: entry.batch?.trim() || '',
-          rollNo: cleanRollNo,
-          email: entry.email?.trim() || '',
-          day: cleanDay,
-          points: Number(entry.points),
-          timeSeconds: Number(entry.timeSeconds),
-          firstTryCount: Number(entry.firstTryCount || 0),
-          totalQuestions: Number(entry.totalQuestions || 3),
-          clientIp: clientIp || entry.clientIp || '',
-          submittedAt: entry.submittedAt || new Date().toISOString(),
-          createdAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
+    // 1. Save new first-attempt score entry in leaderboard collection
+    const entryId = entry.id || `entry-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date();
+    await leaderboardCol.insertOne({
+      id: entryId,
+      username: cleanUsername,
+      fullName: cleanFullName,
+      course: entry.course?.trim() || '',
+      year: entry.year?.trim() || '',
+      batch: entry.batch?.trim() || '',
+      rollNo: cleanRollNo,
+      email: entry.email?.trim() || '',
+      day: cleanDay,
+      points: Number(entry.points),
+      timeSeconds: Number(entry.timeSeconds),
+      firstTryCount: Number(entry.firstTryCount || 0),
+      totalQuestions: Number(entry.totalQuestions || 3),
+      clientIp: clientIp || entry.clientIp || '',
+      submittedAt: entry.submittedAt || now.toISOString(),
+      createdAt: now,
+    });
 
     // 2. Save / Upsert user profile into users collection
     const usersCol = db.collection('users');
     await usersCol.updateOne(
-      { username: entry.username.trim().toLowerCase() },
+      { username: cleanUsername.toLowerCase() },
       {
         $set: {
-          username: entry.username.trim(),
-          fullName: entry.fullName?.trim() || entry.username.trim(),
+          username: cleanUsername,
+          fullName: cleanFullName,
           course: entry.course?.trim() || '',
           year: entry.year?.trim() || '',
           batch: entry.batch?.trim() || '',
           rollNo: cleanRollNo,
           email: entry.email?.trim() || '',
           lastIp: clientIp || '',
-          updatedAt: new Date(),
+          updatedAt: now,
         },
         $setOnInsert: {
-          createdAt: new Date(),
+          createdAt: now,
           editCount: 0,
         },
       },
@@ -90,6 +102,7 @@ export async function saveScoreToMongo(
 export async function checkAttemptInMongo(
   day: number,
   identifier?: string,
+  rollNo?: string,
   clientIp?: string
 ): Promise<{ attempted: boolean; reason?: string; existingScore?: any }> {
   try {
@@ -101,27 +114,40 @@ export async function checkAttemptInMongo(
     const leaderboardCol = db.collection('leaderboard');
     const cleanDay = Number(day);
     const cleanId = (identifier || '').trim();
+    const cleanRoll = (rollNo || '').trim().toUpperCase();
 
-    // Check by username, fullName or rollNo
+    const checkConditions: any[] = [];
+    if (cleanRoll) {
+      checkConditions.push({ rollNo: cleanRoll });
+    }
     if (cleanId) {
       const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const byUser = await leaderboardCol.findOne({
-        day: cleanDay,
-        $or: [
-          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-          { fullName: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-          { rollNo: cleanId.toUpperCase() },
-        ],
-      });
+      checkConditions.push({ username: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+      checkConditions.push({ fullName: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+    }
+
+    if (checkConditions.length > 0) {
+      const byUser = await leaderboardCol.findOne(
+        {
+          day: cleanDay,
+          $or: checkConditions,
+        },
+        { sort: { createdAt: 1, submittedAt: 1, _id: 1 } }
+      );
 
       if (byUser) {
         return {
           attempted: true,
-          reason: `Participant "${cleanId}" has already completed Day ${cleanDay} quiz.`,
+          reason: `Participant "${byUser.fullName || byUser.username || cleanId}" has already completed Day ${cleanDay} quiz.`,
           existingScore: {
             points: byUser.points,
             timeSeconds: byUser.timeSeconds,
             submittedAt: byUser.submittedAt,
+            firstTryCount: byUser.firstTryCount || 0,
+            course: byUser.course || '',
+            year: byUser.year || '',
+            batch: byUser.batch || '',
+            rollNo: byUser.rollNo || '',
           },
         };
       }
@@ -197,13 +223,54 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
     }
     const collection = db.collection('leaderboard');
     const query = day ? { day: Number(day) } : {};
-    const records = await collection
+
+    // 1. Sort chronologically EARLIEST first so we accurately capture the authentic FIRST attempt
+    const allRecords = await collection
       .find(query)
-      .sort({ points: -1, timeSeconds: 1 })
-      .limit(500)
+      .sort({ createdAt: 1, submittedAt: 1, _id: 1 })
       .toArray();
 
-    return records.map(r => ({
+    // 2. Deduplicate strictly by user: Keep only the 1st attempt, discard & delete repeat attempts
+    const firstAttemptMap = new Map<string, any>();
+    const duplicateIds: any[] = [];
+
+    for (const r of allRecords) {
+      const rDay = Number(r.day);
+      const cleanRoll = (r.rollNo || '').trim().toUpperCase();
+      const cleanName = (r.fullName || r.username || '').trim().toLowerCase();
+      // Primary identifier: RollNo if present, otherwise trimmed lowercased name
+      const userKey = cleanRoll ? `roll_${cleanRoll}` : `name_${cleanName}`;
+      const compositeKey = `day_${rDay}_${userKey}`;
+
+      if (firstAttemptMap.has(compositeKey)) {
+        // This is a 2nd, 3rd, or repeated attempt -> discard and queue for DB deletion
+        duplicateIds.push(r._id);
+      } else {
+        // This is the authentic 1st attempt
+        firstAttemptMap.set(compositeKey, r);
+      }
+    }
+
+    // 3. Purge duplicate repeat attempts from MongoDB to permanently fix database integrity
+    if (duplicateIds.length > 0) {
+      collection.deleteMany({ _id: { $in: duplicateIds } }).catch((err) => {
+        console.error('Failed to purge duplicate attempts from MongoDB:', err?.message);
+      });
+    }
+
+    const uniqueFirstAttempts = Array.from(firstAttemptMap.values());
+
+    // 4. Sort official first attempts by leaderboard rules: Points DESC, Speed ASC
+    uniqueFirstAttempts.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (a.timeSeconds !== b.timeSeconds) return a.timeSeconds - b.timeSeconds;
+      if ((b.firstTryCount || 0) !== (a.firstTryCount || 0)) {
+        return (b.firstTryCount || 0) - (a.firstTryCount || 0);
+      }
+      return new Date(a.submittedAt || a.createdAt).getTime() - new Date(b.submittedAt || b.createdAt).getTime();
+    });
+
+    return uniqueFirstAttempts.map(r => ({
       id: r.id || r._id.toString(),
       username: r.username,
       fullName: r.fullName || r.username,
@@ -217,7 +284,7 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       timeSeconds: r.timeSeconds,
       firstTryCount: r.firstTryCount || 0,
       totalQuestions: r.totalQuestions || 3,
-      submittedAt: r.submittedAt || new Date().toISOString(),
+      submittedAt: r.submittedAt || (r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString()),
       clientIp: r.clientIp || '',
     }));
   } catch (err: any) {
