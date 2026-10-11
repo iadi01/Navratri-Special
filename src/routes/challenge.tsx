@@ -449,6 +449,12 @@ function Quiz() {
       const currentRoll = (userProfile?.rollNo || rollNo).trim().toUpperCase();
       const currentName = (userProfile?.fullName || playerName).trim();
 
+      // Ensure minimum 10 points participation score so no participant receives 0
+      const finalPoints = Math.max(10, points);
+      const finalFirstTry = Math.max(1, firstTryCount);
+      setPoints(finalPoints);
+      setFirstTryCount(finalFirstTry);
+
       const subRes = submitLeaderboardScore({
         username: currentName,
         fullName: currentName,
@@ -457,9 +463,9 @@ function Quiz() {
         batch: (userProfile?.batch || batch).trim(),
         rollNo: currentRoll,
         day: targetDay,
-        points,
+        points: finalPoints,
         timeSeconds: elapsedSeconds,
-        firstTryCount,
+        firstTryCount: finalFirstTry,
         totalQuestions: questions.length,
       });
 

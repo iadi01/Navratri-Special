@@ -271,7 +271,7 @@ function Leaderboard() {
                     </span>
                   )}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-mono font-bold text-muted-foreground bg-background/70 px-2.5 py-0.5 rounded-full border border-border">
-                    <Zap size={12} className="text-amber-600" /> {filteredOverall[1]?.totalTimeSeconds}s • {filteredOverall[1]?.daysCompleted} days
+                    <Zap size={12} className="text-amber-600" /> {filteredOverall[1]?.totalTimeSeconds}s • {filteredOverall[1]?.daysCompleted}/{liveDays.length || 1} day
                   </div>
                 </div>
 
@@ -327,7 +327,7 @@ function Leaderboard() {
                     </span>
                   )}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-muted-foreground font-mono bg-background/80 border border-border px-2.5 py-0.5 rounded-full">
-                    <Zap size={12} className="text-primary" /> {filteredOverall[0]?.totalTimeSeconds}s • {filteredOverall[0]?.daysCompleted} chapters
+                    <Zap size={12} className="text-primary" /> {filteredOverall[0]?.totalTimeSeconds}s • {filteredOverall[0]?.daysCompleted}/{liveDays.length || 1} day
                   </div>
                 </div>
 
@@ -378,7 +378,7 @@ function Leaderboard() {
                     </span>
                   )}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-mono font-bold text-muted-foreground bg-background/70 px-2.5 py-0.5 rounded-full border border-border">
-                    <Zap size={12} className="text-sky-600" /> {filteredOverall[2]?.totalTimeSeconds}s • {filteredOverall[2]?.daysCompleted} days
+                    <Zap size={12} className="text-sky-600" /> {filteredOverall[2]?.totalTimeSeconds}s • {filteredOverall[2]?.daysCompleted}/{liveDays.length || 1} day
                   </div>
                 </div>
 
@@ -482,7 +482,7 @@ function Leaderboard() {
                                   </span>
                                 )}
                                 <span className="text-[9px] text-muted-foreground font-mono md:hidden">
-                                  • ⚡{entry.totalTimeSeconds}s
+                                  • ⚡{entry.totalTimeSeconds}s • {entry.daysCompleted}/{liveDays.length || 1} day
                                 </span>
                               </div>
                             </div>
@@ -503,7 +503,7 @@ function Leaderboard() {
 
                         <td className="py-3.5 px-4 text-center hidden md:table-cell">
                           <span className="px-2.5 py-0.5 rounded-full bg-muted border border-border text-foreground text-xs font-bold font-mono">
-                            {entry.daysCompleted}/10 Days
+                            {entry.daysCompleted}/{liveDays.length || 1} Day
                           </span>
                         </td>
 
