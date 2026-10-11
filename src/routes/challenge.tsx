@@ -35,6 +35,9 @@ import {
   saveUserProfile,
   isQuizAttempted,
   checkServerAttempt,
+  getQuizProgress,
+  saveQuizProgress,
+  clearQuizProgress,
   type UserProfile,
 } from '@/lib/leaderboard-store';
 
@@ -93,6 +96,12 @@ function Quiz() {
   const [points, setPoints] = useState(0);
   const [best, setBest] = useState(0);
 
+  // Single-attempt per question & auto-transition
+  const [answered, setAnswered] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const autoAdvanceTimerRef = useRef<any>(null);
+
   // Timing & Accuracy tracking
   const startTimeRef = useRef<number>(0);
   const [timeTaken, setTimeTaken] = useState<number>(0);
@@ -118,10 +127,21 @@ function Quiz() {
   const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean } | null>(null);
 
   useEffect(() => {
+    return () => {
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     setBest(readBestForDay(targetDay));
     setStarted(false);
     setDone(false);
     setIndex(0);
+    setAnswered(false);
+    setSelectedOption(null);
+    setIsCorrect(null);
     setMissed([]);
     setSolved(false);
     setPoints(0);
@@ -149,28 +169,80 @@ function Quiz() {
         if (res.attempted) {
           setHasAttemptedToday(true);
           setAttemptReason(res.reason || `Day ${targetDay} has already been completed.`);
+          clearQuizProgress(targetDay);
         } else {
           setHasAttemptedToday(false);
           setAttemptReason(null);
+
+          // Resume progress if user left halfway
+          const savedProgress = getQuizProgress(targetDay);
+          if (savedProgress && savedProgress.index < questions.length) {
+            setStarted(true);
+            setIndex(savedProgress.index);
+            setPoints(savedProgress.points || 0);
+            setFirstTryCount(savedProgress.firstTryCount || 0);
+            const elapsed = savedProgress.elapsedSeconds || 0;
+            setTimeTaken(elapsed);
+            startTimeRef.current = Date.now() - (elapsed * 1000);
+          }
         }
       });
     } else {
       setHasAttemptedToday(false);
       setAttemptReason(null);
+      const savedProgress = getQuizProgress(targetDay);
+      if (savedProgress && savedProgress.index < questions.length) {
+        setStarted(true);
+        setIndex(savedProgress.index);
+        setPoints(savedProgress.points || 0);
+        setFirstTryCount(savedProgress.firstTryCount || 0);
+        const elapsed = savedProgress.elapsedSeconds || 0;
+        setTimeTaken(elapsed);
+        startTimeRef.current = Date.now() - (elapsed * 1000);
+      }
     }
   }, [targetDay]);
 
   const launchQuiz = () => {
+    const saved = getQuizProgress(targetDay);
+    if (saved && saved.index < questions.length) {
+      setStarted(true);
+      setDone(false);
+      setIndex(saved.index);
+      setPoints(saved.points || 0);
+      setFirstTryCount(saved.firstTryCount || 0);
+      const elapsed = saved.elapsedSeconds || 0;
+      setTimeTaken(elapsed);
+      startTimeRef.current = Date.now() - (elapsed * 1000);
+      setAnswered(false);
+      setSelectedOption(null);
+      setIsCorrect(null);
+      setMissed([]);
+      setSolved(false);
+      setSubmissionResult(null);
+      return;
+    }
+
     startTimeRef.current = Date.now();
     setStarted(true);
     setDone(false);
     setIndex(0);
+    setAnswered(false);
+    setSelectedOption(null);
+    setIsCorrect(null);
     setMissed([]);
     setSolved(false);
     setPoints(0);
     setTimeTaken(0);
     setFirstTryCount(0);
     setSubmissionResult(null);
+
+    saveQuizProgress(targetDay, {
+      index: 0,
+      points: 0,
+      firstTryCount: 0,
+      elapsedSeconds: 0,
+    });
   };
 
   const handleConfirmProfile = async (e: React.FormEvent) => {
@@ -240,25 +312,73 @@ function Quiz() {
   const q = questions[index] || questions[0];
 
   const choose = (option: string) => {
-    if (solved || missed.includes(option)) return;
+    if (answered) return;
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
+    setAnswered(true);
+    setSelectedOption(option);
+
+    const currentElapsed = Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1));
+
     if (option === q.answer) {
+      setIsCorrect(true);
       setSolved(true);
-      const earned = pointsFor(missed.length);
-      setPoints(p => p + earned);
-      if (missed.length === 0) {
-        setFirstTryCount(c => c + 1);
-      }
+      const newPoints = points + POINTS_FIRST_TRY;
+      const newFirstTry = firstTryCount + 1;
+      setPoints(newPoints);
+      setFirstTryCount(newFirstTry);
+
+      saveQuizProgress(targetDay, {
+        index,
+        points: newPoints,
+        firstTryCount: newFirstTry,
+        elapsedSeconds: currentElapsed,
+      });
+
+      // Auto advance to next question after 1.8s
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        next();
+      }, 1800);
     } else {
-      setMissed(m => [...m, option]);
+      setIsCorrect(false);
+      setSolved(false);
+      setMissed([option]);
+
+      saveQuizProgress(targetDay, {
+        index,
+        points,
+        firstTryCount,
+        elapsedSeconds: currentElapsed,
+      });
+
+      // Auto advance to next question after 2.0s (no 2nd chance!)
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        next();
+      }, 2000);
     }
   };
 
   const next = () => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
+    setAnswered(false);
+    setSelectedOption(null);
+    setIsCorrect(null);
+    setMissed([]);
+    setSolved(false);
+
     if (index + 1 >= questions.length) {
       const elapsedSeconds = Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1));
       setTimeTaken(elapsedSeconds);
       setDone(true);
       setHasAttemptedToday(true);
+      clearQuizProgress(targetDay);
 
       try {
         const currentBest = readBestForDay(targetDay);
@@ -289,9 +409,16 @@ function Quiz() {
       setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true });
       return;
     }
-    setIndex(i => i + 1);
-    setMissed([]);
-    setSolved(false);
+
+    const nextIndex = index + 1;
+    setIndex(nextIndex);
+    const currentElapsed = Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1));
+    saveQuizProgress(targetDay, {
+      index: nextIndex,
+      points,
+      firstTryCount,
+      elapsedSeconds: currentElapsed,
+    });
   };
 
   const isLive = liveDays.includes(targetDay);
@@ -517,7 +644,9 @@ function Quiz() {
 
                     <div className="pt-2">
                       <Button size="lg" className="w-full gap-2 text-sm font-bold shadow-md" onClick={handleStart}>
-                        Start Playing Day {String(currentQuiz.day).padStart(2, '0')} <ArrowRight size={15} />
+                        {getQuizProgress(targetDay)
+                          ? `Resume Day ${String(currentQuiz.day).padStart(2, '0')} (Clue ${(getQuizProgress(targetDay)?.index || 0) + 1})`
+                          : `Start Playing Day ${String(currentQuiz.day).padStart(2, '0')}`} <ArrowRight size={15} />
                       </Button>
                     </div>
                   </div>
@@ -626,48 +755,53 @@ function Quiz() {
 
           <div className="quiz-options">
             {q.options.map((option, i) => {
-              const isAnswer = solved && option === q.answer;
-              const isMissed = missed.includes(option);
+              const isAnswer = answered && option === q.answer;
+              const isSelectedWrong = answered && !isCorrect && option === selectedOption;
+              const isDim = answered && option !== q.answer && option !== selectedOption;
               return (
                 <Button
                   key={option}
                   variant="secondary"
-                  className={`quiz-option ${isAnswer ? 'right' : ''} ${isMissed ? 'wrong' : ''} ${
-                    solved && !isAnswer ? 'dim' : ''
+                  className={`quiz-option ${isAnswer ? 'right' : ''} ${isSelectedWrong ? 'wrong' : ''} ${
+                    isDim ? 'dim' : ''
                   }`}
                   onClick={() => choose(option)}
-                  disabled={solved || isMissed}
+                  disabled={answered}
                 >
                   <span className="key">{KEYS[i]}</span>
                   {option}
                   {isAnswer && <Check size={16} className="ml-auto" />}
-                  {isMissed && <X size={16} className="ml-auto" />}
+                  {isSelectedWrong && <X size={16} className="ml-auto" />}
                 </Button>
               );
             })}
           </div>
 
-          {solved && (
+          {answered && isCorrect && (
             <div className="quiz-feedback">
               <div>
-                <strong>Yes — {q.answer}.</strong>
+                <strong>Yes — {q.answer}. (+10 pts)</strong>
                 {q.fact}
               </div>
             </div>
           )}
-          {!solved && missed.length > 0 && (
+          {answered && !isCorrect && (
             <div className="quiz-feedback bad">
               <div>
-                <strong>Not her — have another go.</strong>
-                {missed.length === 1 ? 'One more try still earns 5 points.' : 'You can still get 2 points for this one.'}
+                <strong>Incorrect — The correct answer is {q.answer}. (0 pts)</strong>
+                {q.fact}
               </div>
             </div>
           )}
 
           <div className="quiz-actions">
-            <span className="quiz-hint">{missed.length > 0 ? `No first-try bonus here — ${POINTS_SECOND_TRY} points up for grabs.` : `First try earns ${POINTS_FIRST_TRY} points.`}</span>
-            <Button onClick={next} disabled={!solved}>
-              {index + 1 === questions.length ? 'See my score' : 'Next clue'} <ArrowRight />
+            <span className="quiz-hint">
+              {answered
+                ? (isCorrect ? 'Correct! Moving to next clue...' : '1 chance only — Moving to next clue...')
+                : `1 chance only • ${POINTS_FIRST_TRY} points for correct answer.`}
+            </span>
+            <Button onClick={next} disabled={!answered}>
+              {index + 1 === questions.length ? 'See my score' : 'Next clue'} <ArrowRight size={15} className="ml-1" />
             </Button>
           </div>
         </div>

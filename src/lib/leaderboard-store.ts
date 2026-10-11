@@ -197,6 +197,51 @@ export async function checkServerAttempt(day: number, identifier?: string): Prom
   return { attempted: isQuizAttempted(day, identifier) };
 }
 
+// ---------------------------------------------------------------------------
+// 💾 QUIZ PROGRESS PERSISTENCE (Resume quiz if left in middle)
+// ---------------------------------------------------------------------------
+
+const QUIZ_PROGRESS_PREFIX = 'pehchaan_quiz_progress_day_';
+
+export type QuizProgress = {
+  day: number;
+  index: number;
+  points: number;
+  firstTryCount: number;
+  elapsedSeconds: number;
+  updatedAt: number;
+};
+
+export function getQuizProgress(day: number): QuizProgress | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(`${QUIZ_PROGRESS_PREFIX}${day}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function saveQuizProgress(day: number, progress: Omit<QuizProgress, 'day' | 'updatedAt'>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const data: QuizProgress = {
+      day,
+      ...progress,
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem(`${QUIZ_PROGRESS_PREFIX}${day}`, JSON.stringify(data));
+  } catch {}
+}
+
+export function clearQuizProgress(day: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(`${QUIZ_PROGRESS_PREFIX}${day}`);
+  } catch {}
+}
+
 export function readLeaderboardFromStorage(): LeaderboardEntry[] {
   if (typeof window === 'undefined') return [];
   try {
