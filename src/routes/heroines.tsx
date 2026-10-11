@@ -204,8 +204,8 @@ function Gallery() {
 
       {/* Detailed Modal */}
       {selectedHeroine && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card text-card-foreground border-2 border-border rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-card text-card-foreground border-2 border-border rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">

@@ -177,31 +177,33 @@ function Leaderboard() {
         </p>
 
         {/* Clean Segmented Tab Switcher */}
-        <div className="inline-flex p-1 bg-muted/80 rounded-2xl border border-border mt-6 shadow-xs">
+        <div className="inline-flex p-1 bg-muted/80 rounded-2xl border border-border mt-6 shadow-xs max-w-full">
           <button
             type="button"
             onClick={() => setActiveTab('overall')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs md:text-sm font-extrabold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
               activeTab === 'overall'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Trophy size={15} />
-            <span>Overall Championship (Main)</span>
+            <Trophy size={14} className="shrink-0" />
+            <span className="hidden sm:inline">Overall Championship (Main)</span>
+            <span className="sm:hidden">Overall</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('daily')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs md:text-sm font-extrabold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
               activeTab === 'daily'
                 ? 'bg-secondary text-secondary-foreground border border-border shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Calendar size={15} />
-            <span>Day-wise Standings</span>
+            <Calendar size={14} className="shrink-0" />
+            <span className="hidden sm:inline">Day-wise Standings</span>
+            <span className="sm:hidden">Day-wise</span>
           </button>
         </div>
       </div>
@@ -406,12 +408,12 @@ function Leaderboard() {
               <table className="w-full text-left border-collapse text-xs md:text-sm">
                 <thead>
                   <tr className="bg-muted/60 border-b border-border text-muted-foreground text-xs font-extrabold uppercase tracking-wider">
-                    <th className="py-3 px-4 w-20 text-center">Rank</th>
-                    <th className="py-3 px-4">Player &amp; Course</th>
-                    <th className="py-3 px-4 text-center">Total Points</th>
-                    <th className="py-3 px-4 text-center">Speed</th>
-                    <th className="py-3 px-4 text-center">Chapters</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4 w-12 sm:w-20 text-center">Rank</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4">Player &amp; Course</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4 text-center">Points</th>
+                    <th className="py-3 px-4 text-center hidden md:table-cell">Speed</th>
+                    <th className="py-3 px-4 text-center hidden md:table-cell">Chapters</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -431,17 +433,17 @@ function Leaderboard() {
                             : 'hover:bg-muted/40'
                         }`}
                       >
-                        <td className="py-3.5 px-4 text-center font-mono">
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center font-mono">
                           {rank === 1 ? (
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30">
+                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30">
                               #1
                             </span>
                           ) : rank === 2 ? (
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-300">
+                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-300">
                               #2
                             </span>
                           ) : rank === 3 ? (
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-black bg-sky-500/15 text-sky-900 dark:text-sky-200 border border-sky-300">
+                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-sky-500/15 text-sky-900 dark:text-sky-200 border border-sky-300">
                               #3
                             </span>
                           ) : (
@@ -449,10 +451,10 @@ function Leaderboard() {
                           )}
                         </td>
 
-                        <td className="py-3.5 px-4 font-bold text-foreground">
-                          <div className="flex items-center gap-2.5">
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 font-bold text-foreground">
+                          <div className="flex items-center gap-2 sm:gap-2.5">
                             <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                                 rank === 1
                                   ? 'bg-primary/15 text-primary border border-primary/30'
                                   : rank === 2
@@ -464,50 +466,53 @@ function Leaderboard() {
                             >
                               {entry.username.slice(0, 1).toUpperCase()}
                             </div>
-                            <div>
-                              <div className="font-extrabold text-foreground text-sm truncate max-w-[180px] md:max-w-[240px]">
+                            <div className="min-w-0">
+                              <div className="font-extrabold text-foreground text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[180px] md:max-w-[240px]">
                                 {entry.fullName || entry.username}
                               </div>
-                              <div className="flex items-center gap-1.5 mt-0.5">
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                 {entry.course && (
-                                  <span className="px-2 py-0.2 rounded-full bg-muted border border-border text-foreground text-[10px] font-bold">
+                                  <span className="px-1.5 py-0.2 rounded-full bg-muted border border-border text-foreground text-[9px] sm:text-[10px] font-bold">
                                     {entry.course}
                                   </span>
                                 )}
                                 {entry.year && (
-                                  <span className="text-[10px] text-muted-foreground font-semibold">
+                                  <span className="text-[9px] sm:text-[10px] text-muted-foreground font-semibold">
                                     • {entry.year}
                                   </span>
                                 )}
+                                <span className="text-[9px] text-muted-foreground font-mono md:hidden">
+                                  • ⚡{entry.totalTimeSeconds}s
+                                </span>
                               </div>
                             </div>
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="font-black text-sm px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
+                          <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
                             {entry.totalPoints} pts
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center font-mono">
+                        <td className="py-3.5 px-4 text-center font-mono hidden md:table-cell">
                           <span className="inline-flex items-center gap-1 text-xs font-extrabold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-lg border border-border">
                             ⚡ {entry.totalTimeSeconds}s
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-3.5 px-4 text-center hidden md:table-cell">
                           <span className="px-2.5 py-0.5 rounded-full bg-muted border border-border text-foreground text-xs font-bold font-mono">
                             {entry.daysCompleted}/10 Days
                           </span>
                         </td>
 
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 justify-end">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1 sm:gap-1.5 justify-end">
                             <button
                               type="button"
                               title="Share Scorecard to BeSocial"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer hover:scale-105 active:scale-95"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenShare(entry, rank);
@@ -519,7 +524,7 @@ function Leaderboard() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
+                              className="h-7 text-xs px-1.5 sm:px-2 text-muted-foreground hover:text-foreground font-semibold cursor-pointer hidden sm:inline-flex"
                               onClick={() => setSelectedUserDetail(entry)}
                             >
                               View <ArrowRight size={11} className="ml-0.5" />
@@ -640,12 +645,12 @@ function Leaderboard() {
               <table className="w-full text-left border-collapse text-xs md:text-sm">
                 <thead>
                   <tr className="bg-muted/60 border-b border-border text-muted-foreground text-xs font-extrabold uppercase tracking-wider">
-                    <th className="py-3 px-4 w-20 text-center">Rank</th>
-                    <th className="py-3 px-4">Player &amp; Course</th>
-                    <th className="py-3 px-4 text-center">Points</th>
-                    <th className="py-3 px-4 text-center">Speed</th>
-                    <th className="py-3 px-4 text-center">Accuracy</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4 w-12 sm:w-20 text-center">Rank</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4">Player &amp; Course</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4 text-center">Points</th>
+                    <th className="py-3 px-4 text-center hidden md:table-cell">Speed</th>
+                    <th className="py-3 px-4 text-center hidden md:table-cell">Accuracy</th>
+                    <th className="py-2.5 sm:py-3 px-2 sm:px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -665,17 +670,17 @@ function Leaderboard() {
                             : 'hover:bg-muted/40'
                         }`}
                       >
-                        <td className="py-3.5 px-4 text-center font-mono">
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center font-mono">
                           {rank === 1 ? (
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30">
+                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30">
                               #1
                             </span>
                           ) : rank === 2 ? (
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-300">
+                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-300">
                               #2
                             </span>
                           ) : rank === 3 ? (
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-black bg-sky-500/15 text-sky-900 dark:text-sky-200 border border-sky-300">
+                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-sky-500/15 text-sky-900 dark:text-sky-200 border border-sky-300">
                               #3
                             </span>
                           ) : (
@@ -683,10 +688,10 @@ function Leaderboard() {
                           )}
                         </td>
 
-                        <td className="py-3.5 px-4 font-bold text-foreground">
-                          <div className="flex items-center gap-2.5">
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 font-bold text-foreground">
+                          <div className="flex items-center gap-2 sm:gap-2.5">
                             <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                                 rank === 1
                                   ? 'bg-primary/15 text-primary border border-primary/30'
                                   : rank === 2
@@ -698,48 +703,51 @@ function Leaderboard() {
                             >
                               {entry.username.slice(0, 1).toUpperCase()}
                             </div>
-                            <div>
-                              <div className="font-extrabold text-foreground text-sm truncate max-w-[180px]">
+                            <div className="min-w-0">
+                              <div className="font-extrabold text-foreground text-xs sm:text-sm truncate max-w-[120px] sm:max-w-[180px]">
                                 {entry.fullName || entry.username}
                               </div>
-                              <div className="flex items-center gap-1.5 mt-0.5">
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                 {entry.course && (
-                                  <span className="px-2 py-0.2 rounded-full bg-muted border border-border text-foreground text-[10px] font-bold">
+                                  <span className="px-1.5 py-0.2 rounded-full bg-muted border border-border text-foreground text-[9px] sm:text-[10px] font-bold">
                                     {entry.course}
                                   </span>
                                 )}
                                 {entry.year && (
-                                  <span className="text-[10px] text-muted-foreground font-semibold">
+                                  <span className="text-[9px] sm:text-[10px] text-muted-foreground font-semibold">
                                     • {entry.year}
                                   </span>
                                 )}
+                                <span className="text-[9px] text-muted-foreground font-mono md:hidden">
+                                  • ⚡{entry.timeSeconds}s
+                                </span>
                               </div>
                             </div>
                           </div>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="font-black text-sm px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
+                          <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
                             {entry.points} pts
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center font-mono">
+                        <td className="py-3.5 px-4 text-center font-mono hidden md:table-cell">
                           <span className="inline-flex items-center gap-1 text-xs font-extrabold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-lg border border-border">
                             ⚡ {entry.timeSeconds}s
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-center font-mono text-xs text-foreground font-bold">
+                        <td className="py-3.5 px-4 text-center font-mono text-xs text-foreground font-bold hidden md:table-cell">
                           {entry.firstTryCount}/{entry.totalQuestions} first try
                         </td>
 
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 justify-end">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1 sm:gap-1.5 justify-end">
                             <button
                               type="button"
                               title="Share Scorecard to BeSocial"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer hover:scale-105 active:scale-95"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenShare(entry, rank, selectedDay);
@@ -751,7 +759,7 @@ function Leaderboard() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
+                              className="h-7 text-xs px-1.5 sm:px-2 text-muted-foreground hover:text-foreground font-semibold cursor-pointer hidden sm:inline-flex"
                               onClick={() => setSelectedUserDetail(entry)}
                             >
                               View <ArrowRight size={11} className="ml-0.5" />
@@ -780,8 +788,8 @@ function Leaderboard() {
       {/* 🎓 USER PROFILE DETAIL MODAL (PROMINENT & SOFT HARMONIOUS DESIGN) */}
       {/* ========================================================================= */}
       {selectedUserDetail && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card text-card-foreground border-2 border-border rounded-3xl max-w-md w-full p-6 md:p-7 shadow-xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-card text-card-foreground border-2 border-border rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div className="flex items-center gap-3">

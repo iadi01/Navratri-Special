@@ -18,11 +18,11 @@ import {
   X,
   Share2,
   ExternalLink,
-  Sparkles,
 } from 'lucide-react';
 import { ShareCardModal } from '@/components/share-card-modal';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
+import { LotusIcon } from '@/components/lotus-icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -534,7 +534,7 @@ function Quiz() {
                           placeholder="e.g. Rahul Sharma"
                           value={playerName}
                           onChange={e => setPlayerName(e.target.value)}
-                          className="h-8.5 text-xs"
+                          className="h-9 sm:h-8.5 text-base sm:text-xs"
                           required
                         />
                       </div>
@@ -546,7 +546,7 @@ function Quiz() {
                             id="player-course"
                             value={course}
                             onChange={e => setCourse(e.target.value)}
-                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-8.5 font-medium"
+                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base sm:text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-9 sm:h-8.5 font-medium"
                           >
                             <option value="BBA">BBA</option>
                             <option value="BCA">BCA</option>
@@ -564,7 +564,7 @@ function Quiz() {
                             id="player-semester"
                             value={year}
                             onChange={e => setYear(e.target.value)}
-                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-8.5 font-medium"
+                            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-base sm:text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring h-9 sm:h-8.5 font-medium"
                           >
                             <option value="1st Sem">1st Sem</option>
                             <option value="2nd Sem">2nd Sem</option>
@@ -583,7 +583,7 @@ function Quiz() {
                           placeholder="e.g. 2024–2028 / Batch A"
                           value={batch}
                           onChange={e => setBatch(e.target.value)}
-                          className="h-8.5 text-xs"
+                          className="h-9 sm:h-8.5 text-base sm:text-xs"
                         />
                       </div>
 
@@ -711,7 +711,7 @@ function Quiz() {
             {/* 📸 BeSocial Share Section (Theme Matched) */}
             <div className="bg-[var(--petal)] border-[1.5px] border-[var(--foreground)] rounded-2xl p-5 my-5 max-w-lg mx-auto text-center space-y-3.5 shadow-[4px_5px_0_var(--border)] relative">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--butter)] border border-[var(--foreground)] text-[var(--foreground)] text-xs font-extrabold tracking-wide shadow-[1.5px_1.5px_0_var(--foreground)]">
-                <Sparkles size={13} className="text-[var(--primary)]" /> SHARE YOUR ACHIEVEMENT
+                <LotusIcon size={14} className="text-[var(--primary)]" /> SHARE YOUR ACHIEVEMENT
               </div>
               <h3 className="text-xl font-black text-[var(--foreground)] font-display tracking-tight">
                 Post Your Official Scorecard on BeSocial!

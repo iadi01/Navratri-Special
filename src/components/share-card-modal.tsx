@@ -6,10 +6,10 @@ import {
   ExternalLink,
   Check,
   X,
-  Sparkles,
   Trophy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LotusIcon } from '@/components/lotus-icon';
 
 interface ShareCardModalProps {
   isOpen: boolean;
@@ -53,7 +53,7 @@ export function ShareCardModal({
   const websiteUrl = 'https://navratri-event.vercel.app';
   const besocialUrl = 'https://besocial.amityonline.com/?tab=Posts';
 
-  const shareCaption = `🏆 I scored ${points}/${maxPoints} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸✨\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
+  const shareCaption = `🏆 I scored ${points}/${maxPoints} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
 
   const drawCard = () => {
     const canvas = canvasRef.current;
@@ -108,7 +108,7 @@ export function ShareCardModal({
     ctx.fillStyle = '#1e3a34';
     ctx.font = '800 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.letterSpacing = '1.5px';
-    ctx.fillText('✨ NAVRATRI SPECIAL ✨', width / 2, tapeY + 22);
+    ctx.fillText('🪔 NAVRATRI SPECIAL 🪔', width / 2, tapeY + 22);
 
     // 4. Branding Titles
     ctx.fillStyle = '#1e3a34';
@@ -327,12 +327,12 @@ export function ShareCardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in">
-      <div className="relative w-full max-w-2xl bg-[var(--background)] border-[1.5px] border-[var(--foreground)] rounded-2xl shadow-[6px_7px_0_var(--border)] p-5 sm:p-6 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-2xl bg-[var(--background)] border-[1.5px] border-[var(--foreground)] rounded-2xl shadow-[6px_7px_0_var(--border)] p-4 sm:p-6 flex flex-col max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border)] shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[var(--butter)] border border-[var(--foreground)] text-[var(--foreground)] flex items-center justify-center font-bold shadow-[1.5px_1.5px_0_var(--foreground)]">
-              <Sparkles size={16} className="text-[var(--primary)]" />
+              <LotusIcon size={16} className="text-[var(--primary)]" />
             </div>
             <div>
               <h3 className="text-base font-extrabold text-[var(--foreground)] font-display">
@@ -360,10 +360,10 @@ export function ShareCardModal({
             <img
               src={dataUrl}
               alt="Pehchaan Kaun Scorecard"
-              className="w-full h-auto object-contain max-h-[38vh] mx-auto block"
+              className="w-full h-auto object-contain max-h-[26vh] sm:max-h-[36vh] mx-auto block"
             />
           ) : (
-            <div className="h-48 flex items-center justify-center text-xs text-muted-foreground">
+            <div className="h-36 sm:h-48 flex items-center justify-center text-xs text-muted-foreground">
               Generating your scorecard...
             </div>
           )}
@@ -371,18 +371,18 @@ export function ShareCardModal({
 
         {/* Status Message */}
         {statusMessage && (
-          <div className="p-2.5 rounded-xl bg-[var(--mint)] border border-[var(--foreground)] text-[var(--foreground)] text-xs flex items-center gap-2 mb-3 shadow-[2px_2px_0_var(--foreground)]">
+          <div className="p-2.5 rounded-xl bg-[var(--mint)] border border-[var(--foreground)] text-[var(--foreground)] text-xs flex items-center gap-2 mb-3 shadow-[2px_2px_0_var(--foreground)] shrink-0">
             <Check size={14} className="shrink-0 text-emerald-700" /> {statusMessage}
           </div>
         )}
 
         {/* Quick Instructions */}
-        <div className="bg-[var(--petal)] border border-[var(--border)] rounded-xl p-2.5 text-[11px] text-[var(--muted-foreground)] space-y-1 mb-3">
+        <div className="bg-[var(--petal)] border border-[var(--border)] rounded-xl p-2.5 text-[11px] text-[var(--muted-foreground)] space-y-1 mb-3 shrink-0">
           <p className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
             <Trophy size={13} className="text-[var(--primary)]" /> How to post on BeSocial:
           </p>
           <p>
-            1. Click <strong>"Share to BeSocial"</strong> below — your scorecard image will auto-download and BeSocial will open.
+            1. Click <strong>"Share to BeSocial"</strong> below — scorecard image downloads &amp; BeSocial opens.
           </p>
           <p>
             2. Simply attach the downloaded image in your BeSocial post!
@@ -390,13 +390,13 @@ export function ShareCardModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-auto space-y-2 pt-2 border-t border-[var(--border)]">
+        <div className="mt-auto space-y-2 pt-2 border-t border-[var(--border)] shrink-0">
           <Button
             size="lg"
-            className="w-full gap-2 font-bold text-sm h-11 bg-primary text-primary-foreground border-[1.5px] border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] rounded-xl hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] hover:bg-primary/95 transition-all cursor-pointer"
+            className="w-full gap-2 font-bold text-xs sm:text-sm h-11 bg-primary text-primary-foreground border-[1.5px] border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] rounded-xl hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] hover:bg-primary/95 transition-all cursor-pointer"
             onClick={handleShareToBeSocial}
           >
-            <Share2 size={16} /> Share Card to BeSocial (Auto-Download & Open) <ExternalLink size={14} className="opacity-80" />
+            <Share2 size={16} /> <span>Share to BeSocial (1-Click)</span> <span className="hidden sm:inline">(Auto-Download &amp; Open)</span> <ExternalLink size={14} className="opacity-80" />
           </Button>
 
           <div className="grid grid-cols-2 gap-2">

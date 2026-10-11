@@ -47,19 +47,26 @@ export function SiteHeader() {
         </span>
       </Link>
       <nav className="nav" aria-label="Main navigation">
-        <Button variant="ghost" asChild>
-          <Link to="/">The daily hunt</Link>
+        <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
+          <Link to="/">
+            <span className="hidden sm:inline">The daily hunt</span>
+            <span className="sm:hidden">Hunt</span>
+          </Link>
         </Button>
-        <Button variant="ghost" asChild>
-          <Link to="/heroines">Hall of Heroines</Link>
+        <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
+          <Link to="/heroines">
+            <span className="hidden sm:inline">Hall of Heroines</span>
+            <span className="sm:hidden">Heroines</span>
+          </Link>
         </Button>
-        <Button variant="ghost" asChild>
+        <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
           <Link to="/leaderboard">Leaderboard</Link>
         </Button>
       </nav>
-      <Button asChild>
+      <Button asChild size="sm" className="h-8 sm:h-9 text-xs sm:text-sm px-3 font-bold shrink-0">
         <Link to="/challenge">
-          Let's play <ArrowUpRight />
+          <span className="hidden sm:inline">Let's play</span>
+          <span className="sm:hidden">Play</span> <ArrowUpRight size={14} className="ml-0.5" />
         </Link>
       </Button>
     </header>

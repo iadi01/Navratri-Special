@@ -819,43 +819,53 @@ button, a {
 
 @media (max-width: 860px) {
   .wrap {
-    padding-left: 20px;
-    padding-right: 20px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .header {
     height: auto;
-    min-height: 70px;
-    padding-top: 14px;
-    padding-bottom: 12px;
+    min-height: 64px;
+    padding-top: 10px;
+    padding-bottom: 10px;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
     justify-content: space-between;
   }
 
   .brand {
-    font-size: 21px;
+    font-size: 19px;
   }
 
   .brand-mark {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
   }
 
   .nav {
     gap: 4px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
     order: 3;
     width: 100%;
     justify-content: center;
     padding-top: 6px;
+    padding-bottom: 2px;
     border-top: 1px dashed var(--border);
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
   }
 
   .nav a, .nav button {
     font-size: 12px;
     padding: 6px 10px;
     height: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .hero-wrap {
