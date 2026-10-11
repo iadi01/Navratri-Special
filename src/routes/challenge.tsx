@@ -22,7 +22,6 @@ import {
 import { ShareCardModal } from '@/components/share-card-modal';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
-import { LotusIcon } from '@/components/lotus-icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -710,8 +709,8 @@ function Quiz() {
 
             {/* 📸 BeSocial Share Section (Theme Matched) */}
             <div className="bg-[var(--petal)] border-[1.5px] border-[var(--foreground)] rounded-2xl p-5 my-5 max-w-lg mx-auto text-center space-y-3.5 shadow-[4px_5px_0_var(--border)] relative">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--butter)] border border-[var(--foreground)] text-[var(--foreground)] text-xs font-extrabold tracking-wide shadow-[1.5px_1.5px_0_var(--foreground)]">
-                <LotusIcon size={14} className="text-[var(--primary)]" /> SHARE YOUR ACHIEVEMENT
+              <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-[var(--butter)] border border-[var(--foreground)] text-[var(--foreground)] text-xs font-black tracking-wider shadow-[1.5px_1.5px_0_var(--foreground)]">
+                SHARE YOUR ACHIEVEMENT
               </div>
               <h3 className="text-xl font-black text-[var(--foreground)] font-display tracking-tight">
                 Post Your Official Scorecard on BeSocial!

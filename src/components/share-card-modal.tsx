@@ -9,7 +9,6 @@ import {
   Trophy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LotusIcon } from '@/components/lotus-icon';
 
 interface ShareCardModalProps {
   isOpen: boolean;
@@ -330,18 +329,13 @@ export function ShareCardModal({
       <div className="relative w-full max-w-2xl bg-[var(--background)] border-[1.5px] border-[var(--foreground)] rounded-2xl shadow-[6px_7px_0_var(--border)] p-4 sm:p-6 flex flex-col max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[var(--butter)] border border-[var(--foreground)] text-[var(--foreground)] flex items-center justify-center font-bold shadow-[1.5px_1.5px_0_var(--foreground)]">
-              <LotusIcon size={16} className="text-[var(--primary)]" />
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-[var(--foreground)] font-display">
-                Your BeSocial Scorecard
-              </h3>
-              <p className="text-[11px] text-[var(--muted-foreground)]">
-                Official scrapbook scorecard
-              </p>
-            </div>
+          <div>
+            <h3 className="text-base font-extrabold text-[var(--foreground)] font-display">
+              Your BeSocial Scorecard
+            </h3>
+            <p className="text-[11px] text-[var(--muted-foreground)]">
+              Official scrapbook scorecard
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -378,8 +372,8 @@ export function ShareCardModal({
 
         {/* Quick Instructions */}
         <div className="bg-[var(--petal)] border border-[var(--border)] rounded-xl p-2.5 text-[11px] text-[var(--muted-foreground)] space-y-1 mb-3 shrink-0">
-          <p className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
-            <Trophy size={13} className="text-[var(--primary)]" /> How to post on BeSocial:
+          <p className="font-bold text-[var(--foreground)]">
+            How to post on BeSocial:
           </p>
           <p>
             1. Click <strong>"Share to BeSocial"</strong> below — scorecard image downloads &amp; BeSocial opens.
