@@ -16,7 +16,11 @@ import {
   Edit3,
   AlertCircle,
   X,
+  Share2,
+  ExternalLink,
+  Sparkles,
 } from 'lucide-react';
+import { ShareCardModal } from '@/components/share-card-modal';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
 import { Input } from '@/components/ui/input';
@@ -125,6 +129,7 @@ function Quiz() {
 
   // Submission result state
   const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean } | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -703,15 +708,44 @@ function Quiz() {
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground mb-3">Here are the enduring stories from today's hunt:</p>
-            <div className="quiz-recap">
-              {questions.map(item => (
-                <div key={item.id}>
-                  <b>{item.answer}</b>
-                  <p>{item.fact}</p>
-                </div>
-              ))}
+            {/* 📸 BeSocial Share Section (Theme Matched) */}
+            <div className="bg-[var(--petal)] border-[1.5px] border-[var(--foreground)] rounded-2xl p-5 my-5 max-w-lg mx-auto text-center space-y-3.5 shadow-[4px_5px_0_var(--border)] relative">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--butter)] border border-[var(--foreground)] text-[var(--foreground)] text-xs font-extrabold tracking-wide shadow-[1.5px_1.5px_0_var(--foreground)]">
+                <Sparkles size={13} className="text-[var(--primary)]" /> SHARE YOUR ACHIEVEMENT
+              </div>
+              <h3 className="text-xl font-black text-[var(--foreground)] font-display tracking-tight">
+                Post Your Official Scorecard on BeSocial!
+              </h3>
+              <p className="text-xs text-[var(--muted-foreground)] max-w-sm mx-auto leading-relaxed">
+                Generate and download your official high-res scorecard with your score, time, and rank, and share it directly on BeSocial.
+              </p>
+              <div className="pt-1">
+                <Button
+                  size="lg"
+                  className="w-full gap-2 font-bold text-sm h-11 bg-primary text-primary-foreground border-[1.5px] border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] rounded-xl hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] hover:bg-primary/95 transition-all cursor-pointer"
+                  onClick={() => setIsShareModalOpen(true)}
+                >
+                  <Share2 size={16} /> Share Card to BeSocial <ExternalLink size={14} className="ml-0.5 opacity-80" />
+                </Button>
+              </div>
             </div>
+
+            <ShareCardModal
+              isOpen={isShareModalOpen}
+              onClose={() => setIsShareModalOpen(false)}
+              day={targetDay}
+              dayTitle={currentQuiz.title}
+              points={points}
+              maxPoints={maxPoints}
+              timeTaken={timeTaken}
+              firstTryCount={firstTryCount}
+              totalQuestions={questions.length}
+              rank={submissionResult?.rank || 1}
+              fullName={userProfile?.fullName || playerName}
+              course={userProfile?.course || course}
+              year={userProfile?.year || year}
+              tier={tier}
+            />
 
             <div className="quiz-actions quiz-actions-center mt-6">
               <Button asChild size="lg">

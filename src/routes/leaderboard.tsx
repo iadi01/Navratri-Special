@@ -15,7 +15,9 @@ import {
   User,
   Clock,
   CheckCircle2,
+  Share2,
 } from 'lucide-react';
+import { ShareCardModal } from '@/components/share-card-modal';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
 import { Input } from '@/components/ui/input';
@@ -67,6 +69,46 @@ function Leaderboard() {
   const [dailyList, setDailyList] = useState<LeaderboardEntry[]>([]);
   const [userBest, setUserBest] = useState<number>(0);
   const [selectedUserDetail, setSelectedUserDetail] = useState<OverallLeaderboardEntry | LeaderboardEntry | null>(null);
+  const [shareCardData, setShareCardData] = useState<{
+    day: number;
+    dayTitle: string;
+    points: number;
+    maxPoints: number;
+    timeTaken: number;
+    firstTryCount: number;
+    totalQuestions: number;
+    rank: number;
+    fullName: string;
+    course?: string;
+    year?: string;
+    tier: string;
+  } | null>(null);
+
+  const handleOpenShare = (entry: any, rank: number = 1, forDay?: number) => {
+    if (!entry) return;
+    const targetDay = forDay || entry.day || selectedDay || 1;
+    const quiz = DAILY_QUIZZES.find(q => q.day === targetDay) || DAILY_QUIZZES[0];
+    const points = entry.points ?? entry.totalPoints ?? 30;
+    const timeTaken = entry.timeSeconds ?? entry.totalTimeSeconds ?? 0;
+    const firstTryCount = entry.firstTryCount ?? entry.firstTryTotal ?? 3;
+    const totalQuestions = entry.totalQuestions || 3;
+    const tier = points >= 30 ? 'Herstory Champion' : points >= 20 ? 'Curiosity Star' : 'Brave Explorer';
+
+    setShareCardData({
+      day: targetDay,
+      dayTitle: quiz.title,
+      points,
+      maxPoints: totalQuestions * 10,
+      timeTaken,
+      firstTryCount,
+      totalQuestions,
+      rank,
+      fullName: entry.fullName || entry.username || 'Explorer',
+      course: entry.course || 'BCA',
+      year: entry.year || '1st Sem',
+      tier,
+    });
+  };
 
   const loadData = () => {
     setOverallList(getOverallLeaderboard());
@@ -197,7 +239,21 @@ function Leaderboard() {
                   <span className="text-[11px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-950 dark:text-amber-200 border border-amber-300/50 flex items-center gap-1">
                     <Medal size={12} className="text-amber-600" /> Rank 2
                   </span>
-                  <span className="text-xs font-mono font-black text-amber-800/80 dark:text-amber-400">#2</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="Share Scorecard"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenShare(filteredOverall[1], 2);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-amber-400 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Share2 size={11} className="text-primary shrink-0" />
+                      <span>Share</span>
+                    </button>
+                    <span className="text-xs font-mono font-black text-amber-800/80 dark:text-amber-400">#2</span>
+                  </div>
                 </div>
 
                 <div className="py-2">
@@ -239,7 +295,21 @@ function Leaderboard() {
                   <span className="text-[11px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center gap-1">
                     <Crown size={12} /> Grand Champion
                   </span>
-                  <span className="text-xs font-mono font-black text-primary">#1</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="Share Champion Scorecard"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenShare(filteredOverall[0], 1);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-primary/40 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Share2 size={11} className="text-primary shrink-0" />
+                      <span>Share</span>
+                    </button>
+                    <span className="text-xs font-mono font-black text-primary">#1</span>
+                  </div>
                 </div>
 
                 <div className="py-2">
@@ -276,7 +346,21 @@ function Leaderboard() {
                   <span className="text-[11px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-950 dark:text-sky-200 border border-sky-300/50 flex items-center gap-1">
                     <Award size={12} className="text-sky-600" /> Rank 3
                   </span>
-                  <span className="text-xs font-mono font-black text-sky-800/80 dark:text-sky-400">#3</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      title="Share Scorecard"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenShare(filteredOverall[2], 3);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-sky-400 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Share2 size={11} className="text-primary shrink-0" />
+                      <span>Share</span>
+                    </button>
+                    <span className="text-xs font-mono font-black text-sky-800/80 dark:text-sky-400">#3</span>
+                  </div>
                 </div>
 
                 <div className="py-2">
@@ -418,10 +502,29 @@ function Leaderboard() {
                           </span>
                         </td>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <Button variant="secondary" size="sm" className="h-7.5 text-xs px-2.5 font-bold">
-                            View <ArrowRight size={12} className="ml-1" />
-                          </Button>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              title="Share Scorecard to BeSocial"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenShare(entry, rank);
+                              }}
+                            >
+                              <Share2 size={11} className="text-primary shrink-0" />
+                              <span>Share</span>
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
+                              onClick={() => setSelectedUserDetail(entry)}
+                            >
+                              View <ArrowRight size={11} className="ml-0.5" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -488,11 +591,30 @@ function Leaderboard() {
 
           {/* User Personal Best for this day */}
           {userBest > 0 && (
-            <div className="quiz-best-band">
-              <span>
-                <DiyaIcon size={16} className="text-amber-600 inline mr-1" /> Day {String(selectedDay).padStart(2, '0')} Personal Best:
-              </span>
-              <strong>{userBest} pts</strong>
+            <div className="quiz-best-band flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <DiyaIcon size={16} className="text-amber-600 inline" />
+                <span>Day {String(selectedDay).padStart(2, '0')} Personal Best:</span>
+                <strong>{userBest} pts</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const found = dailyList.find(e => e.points === userBest) || {
+                    points: userBest,
+                    fullName: 'Player',
+                    username: 'player',
+                    timeSeconds: 0,
+                    firstTryCount: 3,
+                    totalQuestions: 3,
+                  };
+                  handleOpenShare(found, 1, selectedDay);
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+              >
+                <Share2 size={11} className="text-primary shrink-0" />
+                <span>Share</span>
+              </button>
             </div>
           )}
 
@@ -612,10 +734,29 @@ function Leaderboard() {
                           {entry.firstTryCount}/{entry.totalQuestions} first try
                         </td>
 
-                        <td className="py-3.5 px-4 text-right">
-                          <Button variant="secondary" size="sm" className="h-7.5 text-xs px-2.5 font-bold">
-                            View <ArrowRight size={11} className="ml-1" />
-                          </Button>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              title="Share Scorecard to BeSocial"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenShare(entry, rank, selectedDay);
+                              }}
+                            >
+                              <Share2 size={11} className="text-primary shrink-0" />
+                              <span>Share</span>
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
+                              onClick={() => setSelectedUserDetail(entry)}
+                            >
+                              View <ArrowRight size={11} className="ml-0.5" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -705,15 +846,37 @@ function Leaderboard() {
               </div>
             </div>
 
-            {/* Close Button */}
-            <Button
-              className="w-full font-extrabold h-10 text-sm rounded-xl"
-              onClick={() => setSelectedUserDetail(null)}
-            >
-              Close Profile
-            </Button>
+            {/* Share & Close Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <Button
+                className="w-full font-black h-11 text-xs sm:text-sm rounded-xl gap-2 bg-[var(--butter)] text-[var(--foreground)] hover:bg-[#fff0a6] border-2 border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                onClick={() => {
+                  handleOpenShare(selectedUserDetail, 1);
+                }}
+              >
+                <Share2 size={16} className="text-primary stroke-[2.5]" />
+                <span>Share Scorecard to BeSocial</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full font-bold h-9 text-xs rounded-xl"
+                onClick={() => setSelectedUserDetail(null)}
+              >
+                Close Profile
+              </Button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* 📸 BeSocial Share Card Modal */}
+      {shareCardData && (
+        <ShareCardModal
+          isOpen={!!shareCardData}
+          onClose={() => setShareCardData(null)}
+          {...shareCardData}
+        />
       )}
     </main>
   );
