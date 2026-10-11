@@ -93,19 +93,19 @@ export function IntroVideoModal() {
 
     const video = videoRef.current;
     video.currentTime = 0;
-    // Sound ALWAYS ON initially
+    video.volume = 1.0;
     video.muted = false;
     setIsMuted(false);
 
     const tryPlayWithSound = async () => {
       try {
+        video.volume = 1.0;
         video.muted = false;
         await video.play();
         setIsMuted(false);
         setIsPlaying(true);
       } catch (err) {
-        // If browser blocks unmuted autoplay before user interaction:
-        // Play muted first so video starts immediately, then on very first user click/touch anywhere unmute automatically!
+        // Modern mobile/desktop browsers block audio before 1st user interaction
         try {
           video.muted = true;
           setIsMuted(true);
@@ -114,15 +114,18 @@ export function IntroVideoModal() {
 
           const unmuteOnInteraction = () => {
             if (videoRef.current) {
+              videoRef.current.volume = 1.0;
               videoRef.current.muted = false;
               setIsMuted(false);
             }
             window.removeEventListener('click', unmuteOnInteraction);
             window.removeEventListener('touchstart', unmuteOnInteraction);
+            window.removeEventListener('keydown', unmuteOnInteraction);
           };
 
           window.addEventListener('click', unmuteOnInteraction, { once: true });
           window.addEventListener('touchstart', unmuteOnInteraction, { once: true });
+          window.addEventListener('keydown', unmuteOnInteraction, { once: true });
         } catch {
           /* ignore play errors */
         }
@@ -191,6 +194,7 @@ export function IntroVideoModal() {
         className="w-full h-full max-h-screen max-w-full object-contain bg-black cursor-pointer select-none"
         playsInline
         autoPlay
+        preload="auto"
         onClick={togglePlay}
         onEnded={handleClose}
       >
@@ -260,8 +264,8 @@ export function IntroVideoModal() {
 
       {/* Bottom Hint */}
       <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-        <p className="text-[11px] text-white/50 tracking-wider font-light">
-          Tap anywhere to pause • Video closes automatically when finished
+        <p className="text-[11px] text-white/60 tracking-wider font-light">
+          {isMuted ? 'Tap anywhere to turn Sound ON 🔊 • Video closes automatically when finished' : 'Tap anywhere to pause • Video closes automatically when finished'}
         </p>
       </div>
     </div>
