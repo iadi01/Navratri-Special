@@ -136,18 +136,18 @@ function Quiz() {
       setYear(profile.year || '1st Sem');
       setBatch(profile.batch || '');
       setRollNo(profile.rollNo || '');
-      setIsEditingProfile(!profile.rollNo);
+      setIsEditingProfile(!profile.fullName);
     } else {
       setIsEditingProfile(true);
     }
 
     // Check 1 attempt locally and with server
-    const localAttempted = isQuizAttempted(targetDay, profile?.rollNo);
+    const localAttempted = isQuizAttempted(targetDay, profile?.fullName);
     if (localAttempted) {
       setHasAttemptedToday(true);
       setAttemptReason(`You have already completed Day ${targetDay} challenge on this device.`);
     } else {
-      checkServerAttempt(targetDay, profile?.rollNo).then((res) => {
+      checkServerAttempt(targetDay, profile?.fullName).then((res) => {
         if (res.attempted) {
           setHasAttemptedToday(true);
           setAttemptReason(res.reason || `Day ${targetDay} has already been completed.`);
@@ -164,21 +164,15 @@ function Quiz() {
     setProfileError(null);
 
     const cleanName = playerName.trim();
-    const cleanRoll = rollNo.trim().toUpperCase();
 
     if (!cleanName) {
       setProfileError('Please enter your full name.');
-      return;
-    }
-    if (!cleanRoll) {
-      setProfileError('Please enter your University / College Roll Number.');
       return;
     }
 
     const res = saveUserProfile({
       fullName: cleanName,
       username: cleanName,
-      rollNo: cleanRoll,
       course: course.trim(),
       year: year.trim(),
       batch: batch.trim(),
@@ -192,17 +186,17 @@ function Quiz() {
     setUserProfile(res.profile);
     setIsEditingProfile(false);
 
-    // Re-check attempt with this roll number
-    checkServerAttempt(targetDay, cleanRoll).then((attemptRes) => {
+    // Re-check attempt with this name
+    checkServerAttempt(targetDay, cleanName).then((attemptRes) => {
       if (attemptRes.attempted) {
         setHasAttemptedToday(true);
-        setAttemptReason(attemptRes.reason || `Roll No ${cleanRoll} has already completed Day ${targetDay} quiz.`);
+        setAttemptReason(attemptRes.reason || `Participant ${cleanName} has already completed Day ${targetDay} quiz.`);
       }
     });
   };
 
   const handleStart = () => {
-    if (!userProfile || !userProfile.rollNo || !userProfile.fullName) {
+    if (!userProfile || !userProfile.fullName) {
       setIsEditingProfile(true);
       setProfileError('Please fill and confirm your participant details before starting.');
       return;
@@ -368,7 +362,7 @@ function Quiz() {
                           <p className="text-[11px] text-muted-foreground">Confirm your verified details before starting the quiz</p>
                         </div>
                       </div>
-                      {userProfile?.rollNo && (
+                      {userProfile?.fullName && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
                           {2 - (userProfile.editCount || 0)} edits left
                         </span>
@@ -392,19 +386,6 @@ function Quiz() {
                           className="h-8.5 text-xs"
                           required
                         />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="player-roll" className="text-xs">University / College Roll No *</Label>
-                        <Input
-                          id="player-roll"
-                          placeholder="e.g. 2024-BCA-042"
-                          value={rollNo}
-                          onChange={e => setRollNo(e.target.value.toUpperCase())}
-                          className="h-8.5 text-xs font-mono"
-                          required
-                        />
-                        <p className="text-[10px] text-muted-foreground">Used to identify your score on the live tournament leaderboard.</p>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -459,7 +440,7 @@ function Quiz() {
                         <Button type="submit" size="sm" className="w-full gap-1.5 h-9 font-semibold">
                           <Check size={14} /> Confirm Details & Continue
                         </Button>
-                        {userProfile?.rollNo && (
+                        {userProfile?.fullName && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -506,16 +487,12 @@ function Quiz() {
                         <strong className="text-foreground">{userProfile.fullName}</strong>
                       </div>
                       <div>
-                        <span className="text-[11px] text-muted-foreground block">Roll No:</span>
-                        <strong className="text-foreground font-mono">{userProfile.rollNo}</strong>
-                      </div>
-                      <div>
                         <span className="text-[11px] text-muted-foreground block">Course & Sem:</span>
                         <span className="text-foreground font-medium">{userProfile.course} • {userProfile.year}</span>
                       </div>
-                      <div>
+                      <div className="col-span-2">
                         <span className="text-[11px] text-muted-foreground block">Batch:</span>
-                        <span className="text-foreground font-medium">{userProfile.batch || 'N/A'}</span>
+                        <span className="text-foreground font-medium">{userProfile.batch || 'General Batch'}</span>
                       </div>
                     </div>
 
@@ -573,8 +550,8 @@ function Quiz() {
               </div>
               <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-border/50">
                 <span><b>Participant:</b> {userProfile?.fullName || playerName}</span>
-                <span><b>Roll No:</b> {userProfile?.rollNo || rollNo}</span>
                 <span><b>Course:</b> {userProfile?.course || course} ({userProfile?.year || year})</span>
+                {userProfile?.batch && <span><b>Batch:</b> {userProfile.batch}</span>}
               </div>
             </div>
 

@@ -50,7 +50,7 @@ export type UserProfile = {
   course: string;
   year: string;
   batch: string;
-  rollNo: string;
+  rollNo?: string;
   email?: string;
   editCount: number; // 0: initially saved, 1: first edit, 2: second edit (LOCKED)
   isLocked: boolean; // true if editCount >= 2
@@ -96,13 +96,12 @@ export function saveUserProfile(profile: Partial<UserProfile>): { success: boole
   let editCount = existing ? existing.editCount : 0;
 
   // If already exists and user is modifying fields, check edit count limit
-  if (existing && existing.rollNo) {
+  if (existing && existing.fullName) {
     const hasChanged =
       (profile.fullName && profile.fullName !== existing.fullName) ||
       (profile.course && profile.course !== existing.course) ||
       (profile.year && profile.year !== existing.year) ||
-      (profile.batch && profile.batch !== existing.batch) ||
-      (profile.rollNo && profile.rollNo !== existing.rollNo);
+      (profile.batch && profile.batch !== existing.batch);
 
     if (hasChanged) {
       if (editCount >= 2) {
