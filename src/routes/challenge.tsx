@@ -108,6 +108,8 @@ function Quiz() {
 
   // Timing & Accuracy tracking
   const startTimeRef = useRef<number>(0);
+  const pointsRef = useRef<number>(0);
+  const firstTryCountRef = useRef<number>(0);
   const [timeTaken, setTimeTaken] = useState<number>(0);
   const [firstTryCount, setFirstTryCount] = useState<number>(0);
 
@@ -266,7 +268,9 @@ function Quiz() {
       setDone(false);
       setIndex(saved.index);
       setPoints(saved.points || 0);
+      pointsRef.current = saved.points || 0;
       setFirstTryCount(saved.firstTryCount || 0);
+      firstTryCountRef.current = saved.firstTryCount || 0;
       const elapsed = saved.elapsedSeconds || 0;
       setTimeTaken(elapsed);
       startTimeRef.current = Date.now() - (elapsed * 1000);
@@ -289,8 +293,10 @@ function Quiz() {
     setMissed([]);
     setSolved(false);
     setPoints(0);
+    pointsRef.current = 0;
     setTimeTaken(0);
     setFirstTryCount(0);
+    firstTryCountRef.current = 0;
     setSubmissionResult(null);
 
     saveQuizProgress(targetDay, {
@@ -425,8 +431,10 @@ function Quiz() {
     if (option === q.answer) {
       setIsCorrect(true);
       setSolved(true);
-      const newPoints = points + POINTS_FIRST_TRY;
-      const newFirstTry = firstTryCount + 1;
+      const newPoints = pointsRef.current + POINTS_FIRST_TRY;
+      const newFirstTry = firstTryCountRef.current + 1;
+      pointsRef.current = newPoints;
+      firstTryCountRef.current = newFirstTry;
       setPoints(newPoints);
       setFirstTryCount(newFirstTry);
 
@@ -448,8 +456,8 @@ function Quiz() {
 
       saveQuizProgress(targetDay, {
         index,
-        points,
-        firstTryCount,
+        points: pointsRef.current,
+        firstTryCount: firstTryCountRef.current,
         elapsedSeconds: currentElapsed,
       });
 
@@ -481,9 +489,9 @@ function Quiz() {
 
       try {
         const currentBest = readBestForDay(targetDay);
-        if (points > currentBest) {
-          localStorage.setItem(`${BEST_KEY_PREFIX}${targetDay}`, String(points));
-          setBest(points);
+        if (pointsRef.current > currentBest) {
+          localStorage.setItem(`${BEST_KEY_PREFIX}${targetDay}`, String(pointsRef.current));
+          setBest(pointsRef.current);
         }
       } catch {}
 
@@ -492,8 +500,8 @@ function Quiz() {
       const currentName = (userProfile?.fullName || playerName).trim();
 
       // No artificial participation points - true score is preserved!
-      const rawPoints = points;
-      const finalFirstTry = firstTryCount;
+      const rawPoints = Math.max(points, pointsRef.current);
+      const finalFirstTry = Math.max(firstTryCount, firstTryCountRef.current);
 
       // Consecutive streak bonus: If user completed the previous day's quiz, award +2 bonus!
       let streakBonus = 0;
