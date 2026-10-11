@@ -145,16 +145,11 @@ export function saveUserProfile(profile: Partial<UserProfile>): { success: boole
 // 🛡️ 1-ATTEMPT PER DAY VERIFICATION (Client + Server sync)
 // ---------------------------------------------------------------------------
 
-export function isQuizAttempted(day: number, rollNo?: string): boolean {
+export function isQuizAttempted(day: number, identifier?: string): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    const cleanRoll = rollNo ? rollNo.trim().toUpperCase() : '';
-    // Check specific roll number attempt key
-    if (cleanRoll && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanRoll}`)) {
-      return true;
-    }
-    // Check general device attempt key for this day
-    if (localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`)) {
+    const cleanId = identifier ? identifier.trim().toLowerCase() : '';
+    if (cleanId && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanId}`)) {
       return true;
     }
     return false;
@@ -163,37 +158,43 @@ export function isQuizAttempted(day: number, rollNo?: string): boolean {
   }
 }
 
-export function markQuizAttempted(day: number, rollNo?: string, scoreInfo?: any): void {
+export function markQuizAttempted(day: number, identifier?: string, scoreInfo?: any): void {
   if (typeof window === 'undefined') return;
   try {
-    const cleanRoll = rollNo ? rollNo.trim().toUpperCase() : '';
+    const cleanId = identifier ? identifier.trim().toLowerCase() : '';
     const payload = JSON.stringify({
       attemptedAt: new Date().toISOString(),
       day,
-      rollNo: cleanRoll,
+      identifier: cleanId,
       score: scoreInfo,
     });
     localStorage.setItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`, payload);
-    if (cleanRoll) {
-      localStorage.setItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanRoll}`, payload);
+    if (cleanId) {
+      localStorage.setItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanId}`, payload);
     }
   } catch {}
 }
 
-export async function checkServerAttempt(day: number, rollNo?: string): Promise<{ attempted: boolean; existingScore?: any }> {
+export async function checkServerAttempt(day: number, identifier?: string): Promise<{ attempted: boolean; existingScore?: any }> {
   if (typeof window === 'undefined') return { attempted: false };
   try {
-    const cleanRoll = rollNo ? encodeURIComponent(rollNo.trim().toUpperCase()) : '';
-    const res = await fetch(`/api/check-attempt?day=${day}&rollNo=${cleanRoll}`);
+    const cleanId = identifier ? encodeURIComponent(identifier.trim().toLowerCase()) : '';
+    const res = await fetch(`/api/check-attempt?day=${day}&username=${cleanId}`);
     if (res.ok) {
       const data = await res.json();
       if (data.attempted) {
-        markQuizAttempted(day, rollNo, data.existingScore);
+        markQuizAttempted(day, identifier, data.existingScore);
+      } else {
+        // Authoritative Server says not attempted: clear any stale local locks
+        localStorage.removeItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`);
+        if (identifier) {
+          localStorage.removeItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${identifier.trim().toLowerCase()}`);
+        }
       }
       return data;
     }
   } catch {}
-  return { attempted: isQuizAttempted(day, rollNo) };
+  return { attempted: isQuizAttempted(day, identifier) };
 }
 
 export function readLeaderboardFromStorage(): LeaderboardEntry[] {
@@ -404,7 +405,7 @@ export function submitLeaderboardScore(params: {
   const rank = dayLeaderboard.findIndex(e => e.id === newEntry.id) + 1;
   const finalRank = rank > 0 ? rank : 1;
 
-  markQuizAttempted(params.day, params.rollNo, {
+  markQuizAttempted(params.day, params.fullName || params.username || params.rollNo, {
     points: params.points,
     timeSeconds: Number(params.timeSeconds.toFixed(1)),
     rank: finalRank,

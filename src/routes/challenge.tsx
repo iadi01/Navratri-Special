@@ -141,13 +141,10 @@ function Quiz() {
       setIsEditingProfile(true);
     }
 
-    // Check 1 attempt locally and with server
-    const localAttempted = isQuizAttempted(targetDay, profile?.fullName);
-    if (localAttempted) {
-      setHasAttemptedToday(true);
-      setAttemptReason(`You have already completed Day ${targetDay} challenge on this device.`);
-    } else {
-      checkServerAttempt(targetDay, profile?.fullName).then((res) => {
+    // Authoritative check with server/MongoDB
+    const candidateName = profile?.fullName || profile?.username;
+    if (candidateName) {
+      checkServerAttempt(targetDay, candidateName).then((res) => {
         if (res.attempted) {
           setHasAttemptedToday(true);
           setAttemptReason(res.reason || `Day ${targetDay} has already been completed.`);
@@ -156,10 +153,26 @@ function Quiz() {
           setAttemptReason(null);
         }
       });
+    } else {
+      setHasAttemptedToday(false);
+      setAttemptReason(null);
     }
   }, [targetDay]);
 
-  const handleConfirmProfile = (e: React.FormEvent) => {
+  const launchQuiz = () => {
+    startTimeRef.current = Date.now();
+    setStarted(true);
+    setDone(false);
+    setIndex(0);
+    setMissed([]);
+    setSolved(false);
+    setPoints(0);
+    setTimeTaken(0);
+    setFirstTryCount(0);
+    setSubmissionResult(null);
+  };
+
+  const handleConfirmProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileError(null);
 
@@ -186,13 +199,27 @@ function Quiz() {
     setUserProfile(res.profile);
     setIsEditingProfile(false);
 
-    // Re-check attempt with this name
-    checkServerAttempt(targetDay, cleanName).then((attemptRes) => {
+    // Verify if this participant has already attempted today
+    try {
+      const attemptRes = await checkServerAttempt(targetDay, cleanName);
       if (attemptRes.attempted) {
         setHasAttemptedToday(true);
         setAttemptReason(attemptRes.reason || `Participant ${cleanName} has already completed Day ${targetDay} quiz.`);
+        return;
       }
-    });
+    } catch {
+      if (isQuizAttempted(targetDay, cleanName)) {
+        setHasAttemptedToday(true);
+        setAttemptReason(`Participant ${cleanName} has already completed Day ${targetDay} quiz.`);
+        return;
+      }
+    }
+
+    setHasAttemptedToday(false);
+    setAttemptReason(null);
+
+    // 🚀 Instantly launch quiz upon confirmation
+    launchQuiz();
   };
 
   const handleStart = () => {
@@ -206,16 +233,7 @@ function Quiz() {
       return;
     }
 
-    startTimeRef.current = Date.now();
-    setStarted(true);
-    setDone(false);
-    setIndex(0);
-    setMissed([]);
-    setSolved(false);
-    setPoints(0);
-    setTimeTaken(0);
-    setFirstTryCount(0);
-    setSubmissionResult(null);
+    launchQuiz();
   };
 
   const q = questions[index] || questions[0];
@@ -351,7 +369,7 @@ function Quiz() {
             ) : (
               /* PARTICIPANT DETAILS & START SECTION */
               <div className="my-5">
-                {(!userProfile?.rollNo || isEditingProfile) ? (
+                {(!userProfile?.fullName || isEditingProfile) ? (
                   /* Form to enter / edit details */
                   <div className="bg-card border border-border rounded-xl p-5 text-left shadow-sm space-y-3.5 max-w-lg mx-auto">
                     <div className="flex items-center justify-between border-b border-border/60 pb-2.5">

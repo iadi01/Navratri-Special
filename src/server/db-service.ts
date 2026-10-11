@@ -89,7 +89,7 @@ export async function saveScoreToMongo(
 
 export async function checkAttemptInMongo(
   day: number,
-  rollNo?: string,
+  identifier?: string,
   clientIp?: string
 ): Promise<{ attempted: boolean; reason?: string; existingScore?: any }> {
   try {
@@ -100,19 +100,28 @@ export async function checkAttemptInMongo(
 
     const leaderboardCol = db.collection('leaderboard');
     const cleanDay = Number(day);
-    const cleanRollNo = (rollNo || '').trim().toUpperCase();
+    const cleanId = (identifier || '').trim();
 
-    // Primary check: Roll Number
-    if (cleanRollNo) {
-      const byRoll = await leaderboardCol.findOne({ day: cleanDay, rollNo: cleanRollNo });
-      if (byRoll) {
+    // Check by username, fullName or rollNo
+    if (cleanId) {
+      const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const byUser = await leaderboardCol.findOne({
+        day: cleanDay,
+        $or: [
+          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+          { fullName: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+          { rollNo: cleanId.toUpperCase() },
+        ],
+      });
+
+      if (byUser) {
         return {
           attempted: true,
-          reason: `Roll No ${cleanRollNo} has already completed Day ${cleanDay} quiz.`,
+          reason: `Participant "${cleanId}" has already completed Day ${cleanDay} quiz.`,
           existingScore: {
-            points: byRoll.points,
-            timeSeconds: byRoll.timeSeconds,
-            submittedAt: byRoll.submittedAt,
+            points: byUser.points,
+            timeSeconds: byUser.timeSeconds,
+            submittedAt: byUser.submittedAt,
           },
         };
       }
