@@ -83,23 +83,60 @@ function Leaderboard() {
     course?: string;
     year?: string;
     tier: string;
+    streakBonus?: number;
   } | null>(null);
+
+  const currentMaxDay = useMemo(() => {
+    let maxRecorded = 1;
+    for (const entry of overallList) {
+      if (entry.dayBreakdown && entry.dayBreakdown.length > 0) {
+        for (const db of entry.dayBreakdown) {
+          if (db.day > maxRecorded) maxRecorded = db.day;
+        }
+      }
+      if (entry.daysCompleted > maxRecorded) {
+        maxRecorded = entry.daysCompleted;
+      }
+    }
+    const maxLive = liveDays && liveDays.length > 0 ? Math.max(...liveDays) : 1;
+    return Math.max(maxLive, maxRecorded, 1);
+  }, [liveDays, overallList]);
+
+  const overallMaxPoints = currentMaxDay * 30;
+
+  const getEntryBonus = (entry: OverallLeaderboardEntry) => {
+    if (entry.dayBreakdown && entry.dayBreakdown.length > 0) {
+      return entry.dayBreakdown.reduce((sum, d) => sum + Math.max(0, d.points - 30), 0);
+    }
+    return Math.max(0, entry.totalPoints - (entry.daysCompleted * 30));
+  };
+
+  const getEntryBasePoints = (entry: OverallLeaderboardEntry) => {
+    const bonus = getEntryBonus(entry);
+    return Math.max(0, entry.totalPoints - bonus);
+  };
 
   const handleOpenShare = (entry: any, rank: number = 1, forDay?: number) => {
     if (!entry) return;
-    const targetDay = forDay || entry.day || selectedDay || 1;
+    const isOverall = !forDay && !('day' in entry);
+    const targetDay = forDay || entry.day || currentMaxDay || 1;
     const quiz = DAILY_QUIZZES.find(q => q.day === targetDay) || DAILY_QUIZZES[0];
-    const points = entry.points ?? entry.totalPoints ?? 30;
+    const totalQuestions = entry.totalQuestions || 3;
+    const maxPoints = isOverall ? overallMaxPoints : totalQuestions * 10;
+    const points = entry.totalPoints ?? entry.points ?? 30;
+    const streakBonus = isOverall
+      ? (entry.dayBreakdown ? entry.dayBreakdown.reduce((s: number, d: any) => s + Math.max(0, d.points - 30), 0) : (points > maxPoints ? points - maxPoints : undefined))
+      : (entry.streakBonus ?? (points > maxPoints ? points - maxPoints : undefined));
     const timeTaken = entry.timeSeconds ?? entry.totalTimeSeconds ?? 0;
     const firstTryCount = entry.firstTryCount ?? entry.firstTryTotal ?? 3;
-    const totalQuestions = entry.totalQuestions || 3;
-    const tier = points >= 30 ? 'Herstory Champion' : points >= 20 ? 'Curiosity Star' : 'Brave Explorer';
+    const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
 
     setShareCardData({
       day: targetDay,
-      dayTitle: quiz.title,
+      dayTitle: isOverall ? `Overall Championship (Day ${currentMaxDay})` : quiz.title,
       points,
-      maxPoints: totalQuestions * 10,
+      maxPoints,
+      streakBonus,
       timeTaken,
       firstTryCount,
       totalQuestions,
@@ -306,9 +343,16 @@ function Leaderboard() {
 
                 <div className="pt-2.5 border-t border-amber-200/80 dark:border-amber-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground uppercase font-bold">Total Score</span>
-                  <span className="font-black text-lg text-foreground">
-                    {filteredOverall[1]?.totalPoints} <small className="text-[10px] font-bold text-muted-foreground">pts</small>
-                  </span>
+                  <div className="text-right">
+                    <span className="font-black text-lg text-foreground">
+                      {filteredOverall[1] ? `${getEntryBasePoints(filteredOverall[1])}/${overallMaxPoints}` : `0/${overallMaxPoints}`}
+                    </span>
+                    {filteredOverall[1] && getEntryBonus(filteredOverall[1]) > 0 && (
+                      <div className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+                        +{getEntryBonus(filteredOverall[1])} for daily login
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -362,9 +406,16 @@ function Leaderboard() {
 
                 <div className="pt-2.5 border-t border-primary/20 dark:border-rose-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-primary uppercase font-black">Champion Score</span>
-                  <span className="font-black text-2xl text-primary">
-                    {filteredOverall[0]?.totalPoints} <small className="text-xs font-bold">pts</small>
-                  </span>
+                  <div className="text-right">
+                    <span className="font-black text-2xl text-primary">
+                      {filteredOverall[0] ? `${getEntryBasePoints(filteredOverall[0])}/${overallMaxPoints}` : `0/${overallMaxPoints}`}
+                    </span>
+                    {filteredOverall[0] && getEntryBonus(filteredOverall[0]) > 0 && (
+                      <div className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+                        +{getEntryBonus(filteredOverall[0])} for daily login
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -413,9 +464,16 @@ function Leaderboard() {
 
                 <div className="pt-2.5 border-t border-sky-200/80 dark:border-sky-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground uppercase font-bold">Total Score</span>
-                  <span className="font-black text-lg text-foreground">
-                    {filteredOverall[2]?.totalPoints} <small className="text-[10px] font-bold text-muted-foreground">pts</small>
-                  </span>
+                  <div className="text-right">
+                    <span className="font-black text-lg text-foreground">
+                      {filteredOverall[2] ? `${getEntryBasePoints(filteredOverall[2])}/${overallMaxPoints}` : `0/${overallMaxPoints}`}
+                    </span>
+                    {filteredOverall[2] && getEntryBonus(filteredOverall[2]) > 0 && (
+                      <div className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+                        +{getEntryBonus(filteredOverall[2])} for daily login
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -519,9 +577,16 @@ function Leaderboard() {
                         </td>
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
-                          <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-                            {entry.totalPoints} pts
-                          </span>
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+                              {getEntryBasePoints(entry)}/{overallMaxPoints}
+                            </span>
+                            {getEntryBonus(entry) > 0 && (
+                              <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 whitespace-nowrap">
+                                +{getEntryBonus(entry)} for daily login
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4 text-center font-mono hidden md:table-cell">
@@ -768,9 +833,16 @@ function Leaderboard() {
                         </td>
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
-                          <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-                            {entry.points} pts
-                          </span>
+                          <div className="inline-flex flex-col items-center">
+                            <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+                              {Math.min(entry.points, 30)}/30
+                            </span>
+                            {entry.points > 30 && (
+                              <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 whitespace-nowrap">
+                                +{entry.points - 30} for daily login
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4 text-center font-mono hidden md:table-cell">
@@ -882,10 +954,24 @@ function Leaderboard() {
             {/* Score & Speed Prominent Badges */}
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl">
-                <span className="text-[11px] text-primary uppercase block font-black">Total Score</span>
+                <span className="text-[11px] text-primary uppercase block font-black">
+                  {'totalPoints' in selectedUserDetail ? 'Overall Score' : 'Day Score'}
+                </span>
                 <strong className="text-2xl font-black text-primary">
-                  {'totalPoints' in selectedUserDetail ? selectedUserDetail.totalPoints : selectedUserDetail.points} <small className="text-xs">pts</small>
+                  {'totalPoints' in selectedUserDetail
+                    ? `${getEntryBasePoints(selectedUserDetail as OverallLeaderboardEntry)}/${overallMaxPoints}`
+                    : `${Math.min(selectedUserDetail.points, 30)}/30`}
                 </strong>
+                {'totalPoints' in selectedUserDetail && getEntryBonus(selectedUserDetail as OverallLeaderboardEntry) > 0 && (
+                  <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5">
+                    +{getEntryBonus(selectedUserDetail as OverallLeaderboardEntry)} for daily login
+                  </span>
+                )}
+                {'points' in selectedUserDetail && selectedUserDetail.points > 30 && (
+                  <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5">
+                    +{selectedUserDetail.points - 30} for daily login
+                  </span>
+                )}
               </div>
               <div className="p-3.5 bg-secondary border border-secondary-foreground/20 rounded-2xl">
                 <span className="text-[11px] text-secondary-foreground uppercase block font-black">Speed Record</span>

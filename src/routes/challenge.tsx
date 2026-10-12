@@ -797,6 +797,7 @@ function Quiz() {
                 dayTitle={currentQuiz.title}
                 points={points}
                 maxPoints={maxPoints}
+                streakBonus={submissionResult?.streakBonus || (points > maxPoints ? points - maxPoints : undefined)}
                 timeTaken={timeTaken}
                 firstTryCount={firstTryCount}
                 totalQuestions={questions.length}
@@ -821,10 +822,15 @@ function Quiz() {
           <div className="quiz-card quiz-result">
             <div className="score-badge">
               <div>
-                <strong>{points}</strong>
+                <strong>{Math.min(points, maxPoints)}</strong>
                 <small>OF {maxPoints}</small>
               </div>
             </div>
+            {(submissionResult?.streakBonus || points > maxPoints) ? (
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-[#fef08a] border border-[#1e3a34] rounded-full text-xs font-black text-[#1e3a34] mt-2 mb-2 shadow-[2px_2px_0_#1e3a34]">
+                +{(submissionResult?.streakBonus || (points - maxPoints))} for daily login
+              </div>
+            ) : null}
             <div className="eyebrow">
               <Trophy size={14} /> {tier}
             </div>
@@ -891,6 +897,7 @@ function Quiz() {
               dayTitle={currentQuiz.title}
               points={points}
               maxPoints={maxPoints}
+              streakBonus={submissionResult?.streakBonus || (points > maxPoints ? points - maxPoints : undefined)}
               timeTaken={timeTaken}
               firstTryCount={firstTryCount}
               totalQuestions={questions.length}
