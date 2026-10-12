@@ -281,7 +281,13 @@ export function readLeaderboardFromStorage(): LeaderboardEntry[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.filter(e => !e.id?.startsWith('seed-'));
+      return parsed
+        .filter(e => !e.id?.startsWith('seed-'))
+        .map(e => ({
+          ...e,
+          points: Math.min(Number(e.points) || 0, 30),
+          firstTryCount: Math.min(Number(e.firstTryCount) || 0, 3),
+        }));
     }
     return [];
   } catch {
@@ -306,7 +312,13 @@ export async function syncLeaderboardWithServer(): Promise<LeaderboardEntry[]> {
     if (res.ok) {
       const serverEntries: LeaderboardEntry[] = await res.json();
       if (Array.isArray(serverEntries)) {
-        const cleanServerEntries = serverEntries.filter(e => !e.id?.startsWith('seed-'));
+        const cleanServerEntries = serverEntries
+          .filter(e => !e.id?.startsWith('seed-'))
+          .map(e => ({
+            ...e,
+            points: Math.min(Number(e.points) || 0, 30),
+            firstTryCount: Math.min(Number(e.firstTryCount) || 0, 3),
+          }));
         localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(cleanServerEntries));
         return cleanServerEntries;
       }
@@ -510,9 +522,9 @@ export function submitLeaderboardScore(params: {
     rollNo: cleanRollNo,
     email: params.email?.trim() || '',
     day: params.day,
-    points: params.points,
+    points: Math.min(params.points, 30),
     timeSeconds: Number(params.timeSeconds.toFixed(1)),
-    firstTryCount: params.firstTryCount,
+    firstTryCount: Math.min(params.firstTryCount, 3),
     totalQuestions: params.totalQuestions,
     submittedAt: new Date().toISOString(),
   };

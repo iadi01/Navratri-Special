@@ -59,9 +59,9 @@ export async function saveScoreToMongo(
       rollNo: cleanRollNo,
       email: entry.email?.trim() || '',
       day: cleanDay,
-      points: Number(entry.points),
+      points: Math.min(Number(entry.points), 30),
       timeSeconds: Number(entry.timeSeconds),
-      firstTryCount: Number(entry.firstTryCount || 0),
+      firstTryCount: Math.min(Number(entry.firstTryCount || 0), 3),
       totalQuestions: Number(entry.totalQuestions || 3),
       clientIp: clientIp || entry.clientIp || '',
       submittedAt: entry.submittedAt || now.toISOString(),
@@ -342,6 +342,18 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
 
     const uniqueFirstAttempts = Array.from(firstAttemptMap.values());
 
+    // 3b. Sanitize scores that have points > 30 (remove streak bonus) and clamp firstTryCount
+    for (const r of uniqueFirstAttempts) {
+      if (r.points > 30) {
+        r.points = 30;
+      }
+      if (r.firstTryCount > 3) {
+        r.firstTryCount = 3;
+      }
+    }
+    collection.updateMany({ points: { $gt: 30 } }, { $set: { points: 30 } }).catch(() => {});
+    collection.updateMany({ firstTryCount: { $gt: 3 } }, { $set: { firstTryCount: 3 } }).catch(() => {});
+
     // 4. Sort official first attempts by leaderboard rules: Points DESC, Speed ASC
     uniqueFirstAttempts.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
@@ -362,9 +374,9 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       rollNo: r.rollNo || '',
       email: r.email || '',
       day: r.day,
-      points: r.points,
+      points: Math.min(r.points, 30),
       timeSeconds: r.timeSeconds,
-      firstTryCount: r.firstTryCount || 0,
+      firstTryCount: Math.min(r.firstTryCount || 0, 3),
       totalQuestions: r.totalQuestions || 3,
       submittedAt: r.submittedAt || (r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString()),
       clientIp: r.clientIp || '',

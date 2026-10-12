@@ -25,7 +25,6 @@ interface ShareCardModalProps {
   course?: string;
   year?: string;
   tier: string;
-  streakBonus?: number;
 }
 
 export function ShareCardModal({
@@ -43,7 +42,6 @@ export function ShareCardModal({
   course = 'BCA',
   year = '1st Sem',
   tier,
-  streakBonus,
 }: ShareCardModalProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -54,10 +52,10 @@ export function ShareCardModal({
   const websiteUrl = 'https://navratri-event.vercel.app';
   const besocialUrl = 'https://besocial.amityonline.com/?tab=Posts';
 
-  const bonusPoints = streakBonus ?? (points > maxPoints ? points - maxPoints : 0);
-  const basePoints = Math.min(points, maxPoints);
+  const safePoints = Math.min(points, maxPoints);
+  const safeAccuracy = Math.min(firstTryCount, totalQuestions);
 
-  const shareCaption = `🏆 I scored ${basePoints}/${maxPoints}${bonusPoints > 0 ? ` (+${bonusPoints} for daily login)` : ''} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
+  const shareCaption = `🏆 I scored ${safePoints}/${maxPoints} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
 
 
   const drawCard = () => {
@@ -180,46 +178,21 @@ export function ShareCardModal({
     // Score numbers inside badge
     ctx.fillStyle = '#1e3a34';
     ctx.font = '900 48px "Baloo 2", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(String(basePoints), width / 2, badgeY + 12);
+    ctx.fillText(String(safePoints), width / 2, badgeY + 12);
 
     ctx.fillStyle = '#8c5010';
     ctx.font = '800 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.letterSpacing = '1px';
     ctx.fillText(`OF ${maxPoints} PTS`, width / 2, badgeY + 32);
 
-    // If streak bonus exists, show "+2 for daily login" underneath the badge
-    if (bonusPoints > 0) {
-      const tagText = `+${bonusPoints} for daily login`;
-      ctx.font = '800 14px "Baloo 2", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.letterSpacing = '0.5px';
-      const textMetrics = ctx.measureText(tagText);
-      const tagW = textMetrics.width + 24;
-      const tagH = 24;
-      const tagX = (width - tagW) / 2;
-      const tagY = badgeY + badgeR + 8;
-
-      // pill bg
-      ctx.fillStyle = '#fef08a';
-      ctx.strokeStyle = '#1e3a34';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(tagX, tagY, tagW, tagH, 12);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#1e3a34';
-      ctx.textAlign = 'center';
-      ctx.fillText(tagText, width / 2, tagY + 17);
-    }
-
     // Tier badge below score
-    const tierY = bonusPoints > 0 ? badgeY + badgeR + 46 : badgeY + 92;
+    const tierY = badgeY + 98;
     ctx.fillStyle = '#c93b54';
     ctx.font = '800 20px "Baloo 2", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.fillText(`🏆 ${tier.toUpperCase()}`, width / 2, tierY);
 
     // 6. Stat Pills (Time, Accuracy, Rank)
-    const pillY = cardY + 304;
+    const pillY = cardY + 298;
     const statBoxWidth = 260;
     const statBoxHeight = 56;
     const gap = 30;
@@ -228,7 +201,7 @@ export function ShareCardModal({
 
     const stats = [
       { label: 'TIME TAKEN', val: `${timeTaken}s`, icon: '⏱️', bg: '#fbf4f4' },
-      { label: 'ACCURACY', val: `${firstTryCount}/${totalQuestions}`, icon: '🎯', bg: '#fef08a' },
+      { label: 'ACCURACY', val: `${safeAccuracy}/${totalQuestions}`, icon: '🎯', bg: '#fef08a' },
       { label: 'CAMPUS RANK', val: `#${rank}`, icon: '🏅', bg: '#fbf4f4' },
     ];
 
@@ -288,7 +261,7 @@ export function ShareCardModal({
     if (isOpen) {
       setTimeout(drawCard, 50);
     }
-  }, [isOpen, points, timeTaken, firstTryCount, fullName, rank, streakBonus]);
+  }, [isOpen, points, timeTaken, firstTryCount, fullName, rank]);
 
   if (!isOpen) return null;
 

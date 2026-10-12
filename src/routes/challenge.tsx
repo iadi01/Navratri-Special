@@ -500,17 +500,10 @@ function Quiz() {
       const currentName = (userProfile?.fullName || playerName).trim();
 
       // No artificial participation points - true score is preserved!
-      const rawPoints = Math.max(points, pointsRef.current);
-      const finalFirstTry = Math.max(firstTryCount, firstTryCountRef.current);
+      const rawPoints = Math.min(Math.max(points, pointsRef.current), maxPoints);
+      const finalFirstTry = Math.min(Math.max(firstTryCount, firstTryCountRef.current), questions.length);
 
-      // Consecutive streak bonus: If user completed the previous day's quiz, award +2 bonus!
-      let streakBonus = 0;
-      if (targetDay > 1 && isQuizAttempted(targetDay - 1, currentName, currentRoll)) {
-        streakBonus = 2;
-      }
-
-      const finalPoints = rawPoints + streakBonus;
-      setPoints(finalPoints);
+      setPoints(rawPoints);
       setFirstTryCount(finalFirstTry);
 
       const subRes = submitLeaderboardScore({
@@ -521,13 +514,13 @@ function Quiz() {
         batch: (userProfile?.batch || batch).trim(),
         rollNo: currentRoll,
         day: targetDay,
-        points: finalPoints,
+        points: rawPoints,
         timeSeconds: elapsedSeconds,
         firstTryCount: finalFirstTry,
         totalQuestions: questions.length,
       });
 
-      setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true, streakBonus });
+      setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true });
       return;
     }
 
@@ -795,11 +788,10 @@ function Quiz() {
                 onClose={() => setIsShareModalOpen(false)}
                 day={targetDay}
                 dayTitle={currentQuiz.title}
-                points={points}
+                points={Math.min(points, maxPoints)}
                 maxPoints={maxPoints}
-                streakBonus={submissionResult?.streakBonus || (points > maxPoints ? points - maxPoints : undefined)}
                 timeTaken={timeTaken}
-                firstTryCount={firstTryCount}
+                firstTryCount={Math.min(firstTryCount, questions.length)}
                 totalQuestions={questions.length}
                 rank={submissionResult?.rank || 1}
                 fullName={userProfile?.fullName || playerName}
@@ -826,11 +818,6 @@ function Quiz() {
                 <small>OF {maxPoints}</small>
               </div>
             </div>
-            {(submissionResult?.streakBonus || points > maxPoints) ? (
-              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-[#fef08a] border border-[#1e3a34] rounded-full text-xs font-black text-[#1e3a34] mt-2 mb-2 shadow-[2px_2px_0_#1e3a34]">
-                +{(submissionResult?.streakBonus || (points - maxPoints))} for daily login
-              </div>
-            ) : null}
             <div className="eyebrow">
               <Trophy size={14} /> {tier}
             </div>
@@ -842,13 +829,8 @@ function Quiz() {
                 <Timer size={14} className="text-primary" /> Time: <span className="font-mono text-primary font-bold">{timeTaken}s</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted/60 rounded-full text-xs font-semibold">
-                <DiyaIcon size={14} className="text-amber-600" /> Accuracy: <span className="font-mono font-bold">{firstTryCount}/{questions.length}</span>
+                <DiyaIcon size={14} className="text-amber-600" /> Accuracy: <span className="font-mono font-bold">{Math.min(firstTryCount, questions.length)}/{questions.length}</span>
               </div>
-              {submissionResult?.streakBonus ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 border border-amber-400/40 rounded-full text-xs font-black text-amber-900 dark:text-amber-200">
-                  ⚡ +{submissionResult.streakBonus} Daily Streak Bonus!
-                </div>
-              ) : null}
             </div>
 
             {/* Auto-Saved Confirmation Box */}
@@ -895,11 +877,10 @@ function Quiz() {
               onClose={() => setIsShareModalOpen(false)}
               day={targetDay}
               dayTitle={currentQuiz.title}
-              points={points}
+              points={Math.min(points, maxPoints)}
               maxPoints={maxPoints}
-              streakBonus={submissionResult?.streakBonus || (points > maxPoints ? points - maxPoints : undefined)}
               timeTaken={timeTaken}
-              firstTryCount={firstTryCount}
+              firstTryCount={Math.min(firstTryCount, questions.length)}
               totalQuestions={questions.length}
               rank={submissionResult?.rank || 1}
               fullName={userProfile?.fullName || playerName}
