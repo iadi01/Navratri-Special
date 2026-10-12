@@ -676,20 +676,32 @@ export async function updateScoreInMongo(params: {
     if (params.course) updateFields.course = params.course.trim();
     if (params.year) updateFields.year = params.year.trim();
     if (params.batch !== undefined) updateFields.batch = params.batch.trim();
-    if (params.rollNo !== undefined) updateFields.rollNo = params.rollNo.trim().toUpperCase();
+    // 🛡️ SECURITY: rollNo is strictly immutable and cannot be changed from admin panel!
 
     await leaderboardCol.updateOne({ _id: existing._id }, { $set: updateFields });
 
-    // Also update users collection for profile consistency
-    const cleanUser = (existing.username || params.username || '').toLowerCase();
+    // When student's name or academic details change, update across ALL days/entries for this user
+    const cleanUser = (existing.username || params.username || '').trim().toLowerCase();
+    const cleanRoll = (existing.rollNo || params.rollNo || '').trim().toUpperCase();
+
+    const userConditions: any[] = [];
     if (cleanUser) {
-      const userUpdate: any = { updatedAt: new Date() };
-      if (params.fullName) userUpdate.fullName = params.fullName.trim();
-      if (params.course) userUpdate.course = params.course.trim();
-      if (params.year) userUpdate.year = params.year.trim();
-      if (params.batch !== undefined) userUpdate.batch = params.batch.trim();
-      if (params.rollNo !== undefined) userUpdate.rollNo = params.rollNo.trim().toUpperCase();
-      await usersCol.updateOne({ username: cleanUser }, { $set: userUpdate });
+      const esc = cleanUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      userConditions.push({ username: { $regex: new RegExp(`^${esc}$`, 'i') } });
+    }
+    if (cleanRoll) {
+      userConditions.push({ rollNo: cleanRoll });
+    }
+
+    if (userConditions.length > 0) {
+      const globalProfileUpdate: any = { updatedAt: new Date() };
+      if (params.fullName) globalProfileUpdate.fullName = params.fullName.trim();
+      if (params.course) globalProfileUpdate.course = params.course.trim();
+      if (params.year) globalProfileUpdate.year = params.year.trim();
+      if (params.batch !== undefined) globalProfileUpdate.batch = params.batch.trim();
+
+      await leaderboardCol.updateMany({ $or: userConditions }, { $set: globalProfileUpdate });
+      await usersCol.updateMany({ $or: userConditions }, { $set: globalProfileUpdate });
     }
 
     return { success: true };

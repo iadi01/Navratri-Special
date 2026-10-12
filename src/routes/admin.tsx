@@ -257,7 +257,7 @@ function AdminPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setStudentActionMsg({ type: 'success', text: `Score and details for "${editingStudent.fullName}" successfully updated in database!` });
+        setStudentActionMsg({ type: 'success', text: `Details for "${editingStudent.fullName}" successfully updated in database!` });
         await syncLeaderboardWithServer();
         setParticipants(getOverallLeaderboard());
         setEditingStudent(null);
@@ -457,16 +457,14 @@ function AdminPage() {
           <HelpCircle size={16} /> Inspect Questions
         </Button>
 
-        {/* Student Directory - Main Admin Only */}
-        {isMainAdmin && (
-          <Button
-            variant={activeTab === 'students' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('students')}
-            className="gap-2"
-          >
-            <GraduationCap size={16} /> Student Directory ({participants.length})
-          </Button>
-        )}
+        {/* Student Directory - Accessible to all Admins */}
+        <Button
+          variant={activeTab === 'students' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('students')}
+          className="gap-2"
+        >
+          <GraduationCap size={16} /> Student Directory ({participants.length})
+        </Button>
 
         {/* Admin Management - Main Admin Only */}
         {isMainAdmin && (
@@ -688,8 +686,8 @@ function AdminPage() {
         </div>
       )}
 
-      {/* TAB 3: STUDENT DIRECTORY (Visible to Main Admin ONLY) */}
-      {isMainAdmin && activeTab === 'students' && (
+      {/* TAB 3: STUDENT DIRECTORY (Visible to all Admins) */}
+      {activeTab === 'students' && (
         <div className="space-y-6">
           <div className="bg-card border border-border rounded-xl p-5 md:p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -698,7 +696,7 @@ function AdminPage() {
                   <GraduationCap size={20} className="text-primary" /> Student &amp; Participant Directory
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Click on any student/user row to view their full Course, Year, Batch, and day-by-day score breakdown.
+                  View verified participants. Admins have permission to correct student names (Roll number and scores are locked).
                 </p>
               </div>
 
@@ -813,19 +811,22 @@ function AdminPage() {
                               handleStartEditStudent(st);
                             }}
                           >
-                            <Edit3 size={12} className="mr-1" /> Edit
+                            <Edit3 size={12} className="mr-1" /> {isMainAdmin ? 'Edit' : 'Edit Name'}
                           </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="h-7 text-xs px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteStudent(st);
-                            }}
-                          >
-                            <Trash2 size={12} />
-                          </Button>
+                          {isMainAdmin && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              title="Delete Participant (Main Admin only)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteStudent(st);
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -928,17 +929,19 @@ function AdminPage() {
                   handleStartEditStudent(selectedStudent);
                 }}
               >
-                <Edit3 size={14} /> Edit Score / Marks
+                <Edit3 size={14} /> {isMainAdmin ? 'Edit Student & Score' : 'Edit Student Name'}
               </Button>
-              <Button
-                variant="destructive"
-                className="flex-1 font-bold text-xs gap-1.5"
-                onClick={() => {
-                  handleDeleteStudent(selectedStudent);
-                }}
-              >
-                <Trash2 size={14} /> Delete Participant
-              </Button>
+              {isMainAdmin && (
+                <Button
+                  variant="destructive"
+                  className="flex-1 font-bold text-xs gap-1.5"
+                  onClick={() => {
+                    handleDeleteStudent(selectedStudent);
+                  }}
+                >
+                  <Trash2 size={14} /> Delete Participant
+                </Button>
+              )}
             </div>
 
             <Button
@@ -959,10 +962,12 @@ function AdminPage() {
             <div className="flex items-start justify-between border-b border-border pb-3">
               <div>
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <Edit3 size={18} className="text-primary" /> Edit Participant &amp; Score
+                  <Edit3 size={18} className="text-primary" /> {isMainAdmin ? 'Edit Participant & Score' : 'Edit Participant Name'}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Update marks/points, speed, and academic details for @{editingStudent.username}
+                  {isMainAdmin
+                    ? `Update marks/points, speed, and academic details for @${editingStudent.username}`
+                    : `Update student name for @${editingStudent.username}. Roll number is locked.`}
                 </p>
               </div>
               <Button
@@ -977,59 +982,88 @@ function AdminPage() {
 
             <form onSubmit={handleSaveStudentEdit} className="space-y-3.5">
               <div className="space-y-1">
-                <Label htmlFor="edit-fullname" className="text-xs font-semibold">Full Name *</Label>
+                <Label htmlFor="edit-fullname" className="text-xs font-bold text-foreground flex items-center justify-between">
+                  <span>Student Full Name *</span>
+                  <span className="text-[11px] font-semibold text-primary">Editable by Admin</span>
+                </Label>
                 <Input
                   id="edit-fullname"
                   value={editingStudent.fullName}
                   onChange={e => setEditingStudent({ ...editingStudent, fullName: e.target.value })}
-                  className="h-9 text-xs"
+                  className="h-9 text-xs font-semibold"
+                  placeholder="Enter student's verified full name"
                   required
                 />
               </div>
 
-              {/* Score / Marks & Time Prominent Inputs */}
-              <div className="grid grid-cols-3 gap-2.5 bg-primary/5 p-3 rounded-xl border border-primary/20">
-                <div className="space-y-1">
-                  <Label htmlFor="edit-points" className="text-xs font-bold text-primary">Score (Points) *</Label>
-                  <Input
-                    id="edit-points"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editingStudent.points}
-                    onChange={e => setEditingStudent({ ...editingStudent, points: Number(e.target.value) })}
-                    className="h-9 text-sm font-black text-primary font-mono"
-                    required
-                  />
+              {/* Score / Marks & Time */}
+              {isMainAdmin ? (
+                <div className="grid grid-cols-3 gap-2.5 bg-primary/5 p-3 rounded-xl border border-primary/20">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-points" className="text-xs font-bold text-primary">Score (Points) *</Label>
+                    <Input
+                      id="edit-points"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editingStudent.points}
+                      onChange={e => setEditingStudent({ ...editingStudent, points: Number(e.target.value) })}
+                      className="h-9 text-sm font-black text-primary font-mono"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-time" className="text-xs font-bold text-emerald-600">Speed (Seconds)</Label>
+                    <Input
+                      id="edit-time"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={editingStudent.timeSeconds}
+                      onChange={e => setEditingStudent({ ...editingStudent, timeSeconds: Number(e.target.value) })}
+                      className="h-9 text-xs font-mono font-bold"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-firsttry" className="text-xs font-bold text-muted-foreground">Attempts (1-3)</Label>
+                    <select
+                      id="edit-firsttry"
+                      value={editingStudent.firstTryCount}
+                      onChange={e => setEditingStudent({ ...editingStudent, firstTryCount: Number(e.target.value) })}
+                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs h-9 font-mono"
+                    >
+                      <option value="3">3/3</option>
+                      <option value="2">2/3</option>
+                      <option value="1">1/3</option>
+                      <option value="0">0/3</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit-time" className="text-xs font-bold text-emerald-600">Speed (Seconds)</Label>
-                  <Input
-                    id="edit-time"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={editingStudent.timeSeconds}
-                    onChange={e => setEditingStudent({ ...editingStudent, timeSeconds: Number(e.target.value) })}
-                    className="h-9 text-xs font-mono font-bold"
-                    required
-                  />
+              ) : (
+                <div className="bg-muted/40 p-3 rounded-xl border border-border space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-muted-foreground">Quiz Score &amp; Marks</span>
+                    <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border flex items-center gap-1">
+                      <Lock size={10} /> Numbers Locked
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-background/80 p-2 rounded-lg border border-border/60">
+                      <span className="text-[10px] text-muted-foreground block">Score</span>
+                      <strong className="text-primary font-black">{editingStudent.points} pts</strong>
+                    </div>
+                    <div className="bg-background/80 p-2 rounded-lg border border-border/60">
+                      <span className="text-[10px] text-muted-foreground block">Speed</span>
+                      <strong className="text-emerald-600 font-mono font-bold">{editingStudent.timeSeconds}s</strong>
+                    </div>
+                    <div className="bg-background/80 p-2 rounded-lg border border-border/60">
+                      <span className="text-[10px] text-muted-foreground block">Accuracy</span>
+                      <strong className="text-foreground font-mono font-bold">{editingStudent.firstTryCount}/3</strong>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit-firsttry" className="text-xs font-bold text-muted-foreground">Attempts (1-3)</Label>
-                  <select
-                    id="edit-firsttry"
-                    value={editingStudent.firstTryCount}
-                    onChange={e => setEditingStudent({ ...editingStudent, firstTryCount: Number(e.target.value) })}
-                    className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs h-9 font-mono"
-                  >
-                    <option value="3">3/3</option>
-                    <option value="2">2/3</option>
-                    <option value="1">1/3</option>
-                    <option value="0">0/3</option>
-                  </select>
-                </div>
-              </div>
+              )}
 
               {/* Academic Info Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
@@ -1080,14 +1114,22 @@ function AdminPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="edit-roll" className="text-xs font-semibold">Roll No / Student ID</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="edit-roll" className="text-xs font-semibold">Roll No / Student ID</Label>
+                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
+                      <Lock size={10} /> Number Locked
+                    </span>
+                  </div>
                   <Input
                     id="edit-roll"
-                    placeholder="Optional"
-                    value={editingStudent.rollNo}
-                    onChange={e => setEditingStudent({ ...editingStudent, rollNo: e.target.value })}
-                    className="h-9 text-xs font-mono"
+                    value={editingStudent.rollNo || 'N/A'}
+                    disabled
+                    readOnly
+                    className="h-9 text-xs font-mono bg-muted/60 opacity-80 cursor-not-allowed border-dashed"
                   />
+                  <p className="text-[10px] text-muted-foreground">
+                    Roll number cannot be changed from admin panel to maintain attempt security.
+                  </p>
                 </div>
               </div>
 
