@@ -87,7 +87,8 @@ function Quiz() {
     return () => window.removeEventListener('pehchaan_live_days_changed', handleUpdate);
   }, []);
 
-  const targetDay = search.day || liveDays[0] || 1;
+  const latestLiveDay = liveDays.length > 0 ? Math.max(...liveDays) : 1;
+  const targetDay = search.day || latestLiveDay || 1;
   const currentQuiz = useMemo(() => getQuizForDay(targetDay), [targetDay]);
   const questions = currentQuiz.questions;
   const maxPoints = questions.length * POINTS_FIRST_TRY;
@@ -105,6 +106,8 @@ function Quiz() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const autoAdvanceTimerRef = useRef<any>(null);
+  const isAdvancingRef = useRef<boolean>(false);
+  const [isAdvancing, setIsAdvancing] = useState<boolean>(false);
 
   // Timing & Accuracy tracking
   const startTimeRef = useRef<number>(0);
@@ -417,7 +420,7 @@ function Quiz() {
   const q = questions[index] || questions[0];
 
   const choose = (option: string) => {
-    if (answered) return;
+    if (answered || isAdvancingRef.current) return;
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = null;
@@ -428,7 +431,10 @@ function Quiz() {
 
     const currentElapsed = Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1));
 
-    if (option === q.answer) {
+    // Case-insensitive & trimmed comparison to guarantee 100% reliable answer matching
+    const isAnswerCorrect = option.trim().toLowerCase() === q.answer.trim().toLowerCase();
+
+    if (isAnswerCorrect) {
       setIsCorrect(true);
       setSolved(true);
       const newPoints = pointsRef.current + POINTS_FIRST_TRY;
@@ -469,6 +475,10 @@ function Quiz() {
   };
 
   const next = () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+    setIsAdvancing(true);
+
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = null;
@@ -486,6 +496,8 @@ function Quiz() {
       setDone(true);
       setHasAttemptedToday(true);
       clearQuizProgress(targetDay);
+      isAdvancingRef.current = false;
+      setIsAdvancing(false);
 
       try {
         const currentBest = readBestForDay(targetDay);
@@ -529,10 +541,15 @@ function Quiz() {
     const currentElapsed = Number(((Date.now() - startTimeRef.current) / 1000).toFixed(1));
     saveQuizProgress(targetDay, {
       index: nextIndex,
-      points,
-      firstTryCount,
+      points: pointsRef.current,
+      firstTryCount: firstTryCountRef.current,
       elapsedSeconds: currentElapsed,
     });
+
+    setTimeout(() => {
+      isAdvancingRef.current = false;
+      setIsAdvancing(false);
+    }, 200);
   };
 
   const isLive = liveDays.includes(targetDay);
@@ -976,7 +993,7 @@ function Quiz() {
                 ? (isCorrect ? 'Correct! Moving to next clue...' : '1 chance only — Moving to next clue...')
                 : `1 chance only • ${POINTS_FIRST_TRY} points for correct answer.`}
             </span>
-            <Button onClick={next} disabled={!answered}>
+            <Button onClick={next} disabled={!answered || isAdvancing}>
               {index + 1 === questions.length ? 'See my score' : 'Next clue'} <ArrowRight size={15} className="ml-1" />
             </Button>
           </div>

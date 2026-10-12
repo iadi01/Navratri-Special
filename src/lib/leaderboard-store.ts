@@ -148,20 +148,20 @@ export function saveUserProfile(profile: Partial<UserProfile>): { success: boole
 export function isQuizAttempted(day: number, identifier?: string, rollNo?: string): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    // 1. Device/Browser day-level lock (set when quiz is submitted)
-    if (localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`)) {
-      return true;
-    }
-
-    // 2. Specific username / candidate lock
+    // 1. Specific username / candidate lock
     const cleanId = identifier ? identifier.trim().toLowerCase() : '';
     if (cleanId && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanId}`)) {
       return true;
     }
 
-    // 3. RollNo lock
+    // 2. RollNo lock
     const cleanRoll = rollNo ? rollNo.trim().toUpperCase() : '';
     if (cleanRoll && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}_${cleanRoll.toLowerCase()}`)) {
+      return true;
+    }
+
+    // 3. Fallback device-level lock ONLY when no specific participant is specified
+    if (!cleanId && !cleanRoll && localStorage.getItem(`${QUIZ_ATTEMPTS_PREFIX}${day}`)) {
       return true;
     }
 
