@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker: Compose Up (Build & Run)",
+      "type": "shell",
+      "command": "docker compose up -d --build",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Docker: Compose Down",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Docker: Compose Logs",
+      "type": "shell",
+      "command": "docker compose logs -f web",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Docker: Build Image Only",
+      "type": "shell",
+      "command": "docker build -t pehchaan-kaun .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Run Container",
+      "type": "shell",
+      "command": "docker run --rm -p 3000:3000 --name pehchaan-kaun pehchaan-kaun",
+      "problemMatcher": []
+    }
+  ]
+}
