@@ -372,7 +372,7 @@ export function getLeaderboardEntries(day?: number): LeaderboardEntry[] {
   return sortLeaderboard(Array.from(firstAttempts.values()));
 }
 
-export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
+export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboardEntry[] {
   const all = readLeaderboardFromStorage();
   const userMap = new Map<string, {
     username: string;
@@ -428,6 +428,7 @@ export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
   }
 
   const overallList: OverallLeaderboardEntry[] = [];
+  const filterActive = Array.isArray(allowedDays) && allowedDays.length > 0 ? new Set(allowedDays) : null;
 
   for (const user of userMap.values()) {
     let totalPoints = 0;
@@ -435,15 +436,20 @@ export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
     let firstTryTotal = 0;
     let bestDay = 1;
     let maxDayPoints = -1;
+    let daysCompleted = 0;
     const dayBreakdown: OverallLeaderboardEntry['dayBreakdown'] = [];
 
     for (const [day, score] of user.dayScores.entries()) {
-      totalPoints += score.points;
-      totalTimeSeconds += score.timeSeconds;
-      firstTryTotal += score.firstTryCount;
-      if (score.points > maxDayPoints) {
-        maxDayPoints = score.points;
-        bestDay = day;
+      const isCounted = !filterActive || filterActive.has(day);
+      if (isCounted) {
+        totalPoints += score.points;
+        totalTimeSeconds += score.timeSeconds;
+        firstTryTotal += score.firstTryCount;
+        daysCompleted += 1;
+        if (score.points > maxDayPoints) {
+          maxDayPoints = score.points;
+          bestDay = day;
+        }
       }
       dayBreakdown.push({
         day,
@@ -466,9 +472,9 @@ export function getOverallLeaderboard(): OverallLeaderboardEntry[] {
       email: user.email || '-',
       totalPoints,
       totalTimeSeconds: Number(totalTimeSeconds.toFixed(1)),
-      daysCompleted: user.dayScores.size,
+      daysCompleted,
       firstTryTotal,
-      bestDay,
+      bestDay: bestDay || 1,
       lastActive: user.lastActive,
       dayBreakdown,
     });

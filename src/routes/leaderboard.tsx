@@ -85,37 +85,19 @@ function Leaderboard() {
     tier: string;
   } | null>(null);
 
-  const activeDays = useMemo(() => {
-    let maxRecorded = 1;
-    for (const entry of overallList) {
-      if (entry.dayBreakdown && entry.dayBreakdown.length > 0) {
-        for (const db of entry.dayBreakdown) {
-          if (db.day > maxRecorded) maxRecorded = db.day;
-        }
-      }
-      if (entry.daysCompleted > maxRecorded) {
-        maxRecorded = entry.daysCompleted;
-      }
-    }
-    const maxLive = liveDays && liveDays.length > 0 ? Math.max(...liveDays) : 1;
-    return Math.max(maxLive, maxRecorded, 1);
-  }, [liveDays, overallList]);
+  // Active / open days currently enabled by admin
+  const openDays = useMemo(() => {
+    const list = Array.isArray(liveDays) && liveDays.length > 0 ? liveDays : [1];
+    return Array.from(new Set(list)).sort((a, b) => a - b);
+  }, [liveDays]);
 
   const overallMaxScore = useMemo(() => {
-    let total = 0;
-    for (let d = 1; d <= activeDays; d++) {
-      total += d === 10 ? 100 : 30;
-    }
-    return total;
-  }, [activeDays]);
+    return openDays.reduce((sum, d) => sum + (d === 10 ? 100 : 30), 0);
+  }, [openDays]);
 
   const overallTotalQuestions = useMemo(() => {
-    let count = 0;
-    for (let d = 1; d <= activeDays; d++) {
-      count += d === 10 ? 10 : 3;
-    }
-    return count;
-  }, [activeDays]);
+    return openDays.reduce((sum, d) => sum + (d === 10 ? 10 : 3), 0);
+  }, [openDays]);
 
   const handleOpenShare = (entry: any, rank: number = 1, forDay?: number) => {
     if (!entry) return;
@@ -127,10 +109,11 @@ function Leaderboard() {
       const firstTryCount = Math.min(entry.firstTryTotal ?? 0, totalQuestions);
       const timeTaken = entry.totalTimeSeconds ?? 0;
       const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
+      const latestLiveDay = openDays[openDays.length - 1] || 1;
 
       setShareCardData({
-        day: activeDays,
-        dayTitle: `Overall Championship (Day ${activeDays})`,
+        day: latestLiveDay,
+        dayTitle: `Overall Championship (${openDays.length} Chapters Active)`,
         points,
         maxPoints,
         timeTaken,
@@ -171,8 +154,9 @@ function Leaderboard() {
     });
   };
 
-  const loadData = () => {
-    setOverallList(getOverallLeaderboard());
+  const loadData = (daysToUse: number[] = liveDays) => {
+    const active = daysToUse && daysToUse.length > 0 ? daysToUse : [1];
+    setOverallList(getOverallLeaderboard(active));
     setDailyList(getLeaderboardEntries(selectedDay));
     try {
       setUserBest(Number(localStorage.getItem(`${BEST_KEY_PREFIX}${selectedDay}`)) || 0);
@@ -182,14 +166,19 @@ function Leaderboard() {
   };
 
   useEffect(() => {
-    loadData();
-    syncLiveDaysWithServer().then(days => setLiveDays(days));
+    loadData(liveDays);
+  }, [liveDays, selectedDay]);
+
+  useEffect(() => {
+    syncLiveDaysWithServer().then(days => {
+      setLiveDays(days);
+    });
     syncLeaderboardWithServer().then(() => {
-      loadData();
+      loadData(getLiveDays());
     });
     const handleUpdate = () => {
-      setLiveDays(getLiveDays());
-      loadData();
+      const days = getLiveDays();
+      setLiveDays(days);
     };
     window.addEventListener('pehchaan_leaderboard_updated', handleUpdate);
     window.addEventListener('pehchaan_live_days_changed', handleUpdate);
@@ -197,7 +186,7 @@ function Leaderboard() {
       window.removeEventListener('pehchaan_leaderboard_updated', handleUpdate);
       window.removeEventListener('pehchaan_live_days_changed', handleUpdate);
     };
-  }, [selectedDay]);
+  }, []);
 
   const filteredOverall = useMemo(() => {
     if (!searchQuery.trim()) return overallList;
@@ -360,7 +349,7 @@ function Leaderboard() {
                     </span>
                   )}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-mono font-bold text-muted-foreground bg-background/70 px-2.5 py-0.5 rounded-full border border-border">
-                    <Zap size={12} className="text-amber-600" /> {filteredOverall[1]?.totalTimeSeconds}s • {filteredOverall[1]?.daysCompleted}/{liveDays.length || 1} day
+                    <Zap size={12} className="text-amber-600" /> {filteredOverall[1]?.totalTimeSeconds}s • {filteredOverall[1]?.daysCompleted}/{openDays.length} day
                   </div>
                 </div>
 
@@ -416,7 +405,7 @@ function Leaderboard() {
                     </span>
                   )}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-muted-foreground font-mono bg-background/80 border border-border px-2.5 py-0.5 rounded-full">
-                    <Zap size={12} className="text-primary" /> {filteredOverall[0]?.totalTimeSeconds}s • {filteredOverall[0]?.daysCompleted}/{liveDays.length || 1} day
+                    <Zap size={12} className="text-primary" /> {filteredOverall[0]?.totalTimeSeconds}s • {filteredOverall[0]?.daysCompleted}/{openDays.length} day
                   </div>
                 </div>
 
@@ -467,7 +456,7 @@ function Leaderboard() {
                     </span>
                   )}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-mono font-bold text-muted-foreground bg-background/70 px-2.5 py-0.5 rounded-full border border-border">
-                    <Zap size={12} className="text-sky-600" /> {filteredOverall[2]?.totalTimeSeconds}s • {filteredOverall[2]?.daysCompleted}/{liveDays.length || 1} day
+                    <Zap size={12} className="text-sky-600" /> {filteredOverall[2]?.totalTimeSeconds}s • {filteredOverall[2]?.daysCompleted}/{openDays.length} day
                   </div>
                 </div>
 
@@ -571,7 +560,7 @@ function Leaderboard() {
                                   </span>
                                 )}
                                 <span className="text-[9px] text-muted-foreground font-mono md:hidden">
-                                  • ⚡{entry.totalTimeSeconds}s • {entry.daysCompleted}/{liveDays.length || 1} day
+                                  • ⚡{entry.totalTimeSeconds}s • {entry.daysCompleted}/{openDays.length} day
                                 </span>
                               </div>
                             </div>
@@ -592,7 +581,7 @@ function Leaderboard() {
 
                         <td className="py-3.5 px-4 text-center hidden md:table-cell">
                           <span className="px-2.5 py-0.5 rounded-full bg-muted border border-border text-foreground text-xs font-bold font-mono">
-                            {entry.daysCompleted}/{liveDays.length || 1} Day
+                            {entry.daysCompleted}/{openDays.length} Day
                           </span>
                         </td>
 
@@ -690,7 +679,7 @@ function Leaderboard() {
                 <DiyaIcon size={16} className="text-amber-600 inline" />
                 <span className="font-bold">Day {String(selectedDay).padStart(2, '0')} Personal Best:</span>
                 <span className="font-black text-primary px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-xs sm:text-sm">
-                  {currentDayUserBest}/30
+                  {currentDayUserBest}/{selectedDay === 10 ? 100 : 30}
                 </span>
                 {currentUserDayEntry && (
                   <span className="text-xs text-muted-foreground font-mono font-bold flex items-center gap-1.5 ml-1">
@@ -946,7 +935,7 @@ function Leaderboard() {
                 <strong className="text-2xl font-black text-primary">
                   {'totalPoints' in selectedUserDetail
                     ? `${selectedUserDetail.totalPoints}/${overallMaxScore}`
-                    : `${selectedUserDetail.points}/30`}
+                    : `${selectedUserDetail.points}/${(selectedUserDetail as any).day === 10 ? 100 : 30}`}
                 </strong>
               </div>
               <div className="p-3.5 bg-secondary border border-secondary-foreground/20 rounded-2xl">
