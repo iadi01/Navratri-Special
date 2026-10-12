@@ -283,11 +283,15 @@ export function readLeaderboardFromStorage(): LeaderboardEntry[] {
     if (Array.isArray(parsed)) {
       return parsed
         .filter(e => !e.id?.startsWith('seed-'))
-        .map(e => ({
-          ...e,
-          points: Math.min(Number(e.points) || 0, 30),
-          firstTryCount: Math.min(Number(e.firstTryCount) || 0, 3),
-        }));
+        .map(e => {
+          const maxQ = e.day === 10 ? 10 : 3;
+          const maxPts = maxQ * 10;
+          return {
+            ...e,
+            points: Math.min(Number(e.points) || 0, maxPts),
+            firstTryCount: Math.min(Number(e.firstTryCount) || 0, maxQ),
+          };
+        });
     }
     return [];
   } catch {
@@ -314,11 +318,15 @@ export async function syncLeaderboardWithServer(): Promise<LeaderboardEntry[]> {
       if (Array.isArray(serverEntries)) {
         const cleanServerEntries = serverEntries
           .filter(e => !e.id?.startsWith('seed-'))
-          .map(e => ({
-            ...e,
-            points: Math.min(Number(e.points) || 0, 30),
-            firstTryCount: Math.min(Number(e.firstTryCount) || 0, 3),
-          }));
+          .map(e => {
+            const maxQ = e.day === 10 ? 10 : 3;
+            const maxPts = maxQ * 10;
+            return {
+              ...e,
+              points: Math.min(Number(e.points) || 0, maxPts),
+              firstTryCount: Math.min(Number(e.firstTryCount) || 0, maxQ),
+            };
+          });
         localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(cleanServerEntries));
         return cleanServerEntries;
       }
@@ -522,10 +530,10 @@ export function submitLeaderboardScore(params: {
     rollNo: cleanRollNo,
     email: params.email?.trim() || '',
     day: params.day,
-    points: Math.min(params.points, 30),
+    points: Math.min(params.points, params.day === 10 ? 100 : 30),
     timeSeconds: Number(params.timeSeconds.toFixed(1)),
-    firstTryCount: Math.min(params.firstTryCount, 3),
-    totalQuestions: params.totalQuestions,
+    firstTryCount: Math.min(params.firstTryCount, params.day === 10 ? 10 : 3),
+    totalQuestions: params.totalQuestions || (params.day === 10 ? 10 : 3),
     submittedAt: new Date().toISOString(),
   };
 

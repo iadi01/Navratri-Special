@@ -101,7 +101,21 @@ function Leaderboard() {
     return Math.max(maxLive, maxRecorded, 1);
   }, [liveDays, overallList]);
 
-  const overallMaxScore = activeDays * 30;
+  const overallMaxScore = useMemo(() => {
+    let total = 0;
+    for (let d = 1; d <= activeDays; d++) {
+      total += d === 10 ? 100 : 30;
+    }
+    return total;
+  }, [activeDays]);
+
+  const overallTotalQuestions = useMemo(() => {
+    let count = 0;
+    for (let d = 1; d <= activeDays; d++) {
+      count += d === 10 ? 10 : 3;
+    }
+    return count;
+  }, [activeDays]);
 
   const handleOpenShare = (entry: any, rank: number = 1, forDay?: number) => {
     if (!entry) return;
@@ -109,7 +123,7 @@ function Leaderboard() {
     if (isOverall) {
       const maxPoints = overallMaxScore;
       const points = Math.min(entry.totalPoints ?? 0, maxPoints);
-      const totalQuestions = activeDays * 3;
+      const totalQuestions = overallTotalQuestions;
       const firstTryCount = Math.min(entry.firstTryTotal ?? 0, totalQuestions);
       const timeTaken = entry.totalTimeSeconds ?? 0;
       const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
@@ -815,7 +829,7 @@ function Leaderboard() {
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
                           <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-                            {entry.points}/30
+                            {entry.points}/{(currentQuiz.questions?.length || 3) * 10}
                           </span>
                         </td>
 

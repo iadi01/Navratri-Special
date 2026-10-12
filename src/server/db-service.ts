@@ -49,6 +49,8 @@ export async function saveScoreToMongo(
     // 1. Save new first-attempt score entry in leaderboard collection
     const entryId = entry.id || `entry-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date();
+    const maxDayQuestions = cleanDay === 10 ? 10 : 3;
+    const maxDayPoints = maxDayQuestions * 10;
     await leaderboardCol.insertOne({
       id: entryId,
       username: cleanUsername,
@@ -59,10 +61,10 @@ export async function saveScoreToMongo(
       rollNo: cleanRollNo,
       email: entry.email?.trim() || '',
       day: cleanDay,
-      points: Math.min(Number(entry.points), 30),
+      points: Math.min(Number(entry.points), maxDayPoints),
       timeSeconds: Number(entry.timeSeconds),
-      firstTryCount: Math.min(Number(entry.firstTryCount || 0), 3),
-      totalQuestions: Number(entry.totalQuestions || 3),
+      firstTryCount: Math.min(Number(entry.firstTryCount || 0), maxDayQuestions),
+      totalQuestions: Number(entry.totalQuestions || maxDayQuestions),
       clientIp: clientIp || entry.clientIp || '',
       submittedAt: entry.submittedAt || now.toISOString(),
       createdAt: now,
@@ -374,10 +376,10 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       rollNo: r.rollNo || '',
       email: r.email || '',
       day: r.day,
-      points: Math.min(r.points, 30),
+      points: Math.min(r.points, r.day === 10 ? 100 : 30),
       timeSeconds: r.timeSeconds,
-      firstTryCount: Math.min(r.firstTryCount || 0, 3),
-      totalQuestions: r.totalQuestions || 3,
+      firstTryCount: Math.min(r.firstTryCount || 0, r.day === 10 ? 10 : 3),
+      totalQuestions: r.totalQuestions || (r.day === 10 ? 10 : 3),
       submittedAt: r.submittedAt || (r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString()),
       clientIp: r.clientIp || '',
     }));
