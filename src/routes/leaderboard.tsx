@@ -85,8 +85,52 @@ function Leaderboard() {
     tier: string;
   } | null>(null);
 
+  const activeDays = useMemo(() => {
+    let maxRecorded = 1;
+    for (const entry of overallList) {
+      if (entry.dayBreakdown && entry.dayBreakdown.length > 0) {
+        for (const db of entry.dayBreakdown) {
+          if (db.day > maxRecorded) maxRecorded = db.day;
+        }
+      }
+      if (entry.daysCompleted > maxRecorded) {
+        maxRecorded = entry.daysCompleted;
+      }
+    }
+    const maxLive = liveDays && liveDays.length > 0 ? Math.max(...liveDays) : 1;
+    return Math.max(maxLive, maxRecorded, 1);
+  }, [liveDays, overallList]);
+
+  const overallMaxScore = activeDays * 30;
+
   const handleOpenShare = (entry: any, rank: number = 1, forDay?: number) => {
     if (!entry) return;
+    const isOverall = !forDay && !entry.day && 'totalPoints' in entry;
+    if (isOverall) {
+      const maxPoints = overallMaxScore;
+      const points = Math.min(entry.totalPoints ?? 0, maxPoints);
+      const totalQuestions = activeDays * 3;
+      const firstTryCount = Math.min(entry.firstTryTotal ?? 0, totalQuestions);
+      const timeTaken = entry.totalTimeSeconds ?? 0;
+      const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
+
+      setShareCardData({
+        day: activeDays,
+        dayTitle: `Overall Championship (Day ${activeDays})`,
+        points,
+        maxPoints,
+        timeTaken,
+        firstTryCount,
+        totalQuestions,
+        rank,
+        fullName: entry.fullName || entry.username || 'Explorer',
+        course: entry.course || 'BCA',
+        year: entry.year || '1st Sem',
+        tier,
+      });
+      return;
+    }
+
     const targetDay = forDay || entry.day || selectedDay || 1;
     const quiz = DAILY_QUIZZES.find(q => q.day === targetDay) || DAILY_QUIZZES[0];
     const totalQuestions = quiz.questions?.length || 3;
@@ -309,7 +353,7 @@ function Leaderboard() {
                 <div className="pt-2.5 border-t border-amber-200/80 dark:border-amber-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground uppercase font-bold">Total Score</span>
                   <span className="font-black text-lg text-foreground">
-                    {filteredOverall[1]?.totalPoints} <small className="text-[10px] font-bold text-muted-foreground">pts</small>
+                    {filteredOverall[1]?.totalPoints ?? 0}/{overallMaxScore}
                   </span>
                 </div>
               </div>
@@ -365,7 +409,7 @@ function Leaderboard() {
                 <div className="pt-2.5 border-t border-primary/20 dark:border-rose-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-primary uppercase font-black">Champion Score</span>
                   <span className="font-black text-2xl text-primary">
-                    {filteredOverall[0]?.totalPoints} <small className="text-xs font-bold">pts</small>
+                    {filteredOverall[0]?.totalPoints ?? 0}/{overallMaxScore}
                   </span>
                 </div>
               </div>
@@ -416,7 +460,7 @@ function Leaderboard() {
                 <div className="pt-2.5 border-t border-sky-200/80 dark:border-sky-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground uppercase font-bold">Total Score</span>
                   <span className="font-black text-lg text-foreground">
-                    {filteredOverall[2]?.totalPoints} <small className="text-[10px] font-bold text-muted-foreground">pts</small>
+                    {filteredOverall[2]?.totalPoints ?? 0}/{overallMaxScore}
                   </span>
                 </div>
               </div>
@@ -522,7 +566,7 @@ function Leaderboard() {
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
                           <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-                            {entry.totalPoints} pts
+                            {entry.totalPoints}/{overallMaxScore}
                           </span>
                         </td>
 
@@ -632,7 +676,7 @@ function Leaderboard() {
                 <DiyaIcon size={16} className="text-amber-600 inline" />
                 <span className="font-bold">Day {String(selectedDay).padStart(2, '0')} Personal Best:</span>
                 <span className="font-black text-primary px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-xs sm:text-sm">
-                  {currentDayUserBest} pts
+                  {currentDayUserBest}/30
                 </span>
                 {currentUserDayEntry && (
                   <span className="text-xs text-muted-foreground font-mono font-bold flex items-center gap-1.5 ml-1">
@@ -771,7 +815,7 @@ function Leaderboard() {
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
                           <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-                            {entry.points} pts
+                            {entry.points}/30
                           </span>
                         </td>
 
@@ -886,7 +930,9 @@ function Leaderboard() {
               <div className="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl">
                 <span className="text-[11px] text-primary uppercase block font-black">Total Score</span>
                 <strong className="text-2xl font-black text-primary">
-                  {'totalPoints' in selectedUserDetail ? selectedUserDetail.totalPoints : selectedUserDetail.points} <small className="text-xs">pts</small>
+                  {'totalPoints' in selectedUserDetail
+                    ? `${selectedUserDetail.totalPoints}/${overallMaxScore}`
+                    : `${selectedUserDetail.points}/30`}
                 </strong>
               </div>
               <div className="p-3.5 bg-secondary border border-secondary-foreground/20 rounded-2xl">

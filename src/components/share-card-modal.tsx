@@ -55,7 +55,10 @@ export function ShareCardModal({
   const safePoints = Math.min(points, maxPoints);
   const safeAccuracy = Math.min(firstTryCount, totalQuestions);
 
-  const shareCaption = `🏆 I scored ${safePoints}/${maxPoints} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
+  const isOverall = dayTitle.toLowerCase().includes('overall');
+  const shareCaption = isOverall
+    ? `🏆 I scored ${safePoints}/${maxPoints} points in the Overall Championship (Day ${String(day).padStart(2, '0')}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`
+    : `🏆 I scored ${safePoints}/${maxPoints} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
 
 
   const drawCard = () => {
@@ -122,7 +125,10 @@ export function ShareCardModal({
     ctx.fillStyle = '#c93b54'; // Site primary terracotta rose
     ctx.font = '800 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.letterSpacing = '1.2px';
-    ctx.fillText(`UNSUNG HEROINES OF INDIA — DAY ${String(day).padStart(2, '0')}: ${dayTitle.toUpperCase()}`, width / 2, 166);
+    const subtitleText = isOverall
+      ? `UNSUNG HEROINES OF INDIA — OVERALL CHAMPIONSHIP (DAY ${String(day).padStart(2, '0')})`
+      : `UNSUNG HEROINES OF INDIA — DAY ${String(day).padStart(2, '0')}: ${dayTitle.toUpperCase()}`;
+    ctx.fillText(subtitleText, width / 2, 166);
 
     // 5. Main Card Container (Scrapbook Card)
     const cardX = 90;
