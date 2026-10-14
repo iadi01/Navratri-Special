@@ -175,31 +175,49 @@ export async function saveUserProfileToMongo(
 
     const usersCol = db.collection('users');
     const cleanRollNo = (profile.rollNo || '').trim().toUpperCase();
+    const cleanName = (profile.fullName || profile.username || '').trim();
+    const escUser = cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Lookup user by rollNo if provided, or by username
-    const filter = cleanRollNo ? { rollNo: cleanRollNo } : { username: profile.username.trim().toLowerCase() };
+    // Lookup user by rollNo if provided, or by case-insensitive name
+    const filter = cleanRollNo
+      ? { rollNo: cleanRollNo }
+      : {
+          $or: [
+            { username: { $regex: new RegExp(`^${escUser}$`, 'i') } },
+            { fullName: { $regex: new RegExp(`^${escUser}$`, 'i') } },
+          ],
+        };
     const existing = await usersCol.findOne(filter);
 
     let editCount = profile.editCount || 0;
     if (existing) {
       const serverEditCount = typeof existing.editCount === 'number' ? existing.editCount : 0;
-      if (serverEditCount >= 2) {
-        return { success: false, error: 'Maximum 2 edits reached. Details are permanently locked.' };
+      const hasChanged =
+        (profile.fullName && existing.fullName && profile.fullName.trim().toLowerCase() !== existing.fullName.trim().toLowerCase()) ||
+        (profile.course && existing.course && profile.course.trim().toLowerCase() !== existing.course.trim().toLowerCase()) ||
+        (profile.year && existing.year && profile.year.trim().toLowerCase() !== existing.year.trim().toLowerCase());
+
+      if (hasChanged) {
+        if (serverEditCount >= 2) {
+          return { success: false, error: 'Maximum 2 edits reached. Details are permanently locked.' };
+        }
+        editCount = serverEditCount + 1;
+      } else {
+        editCount = serverEditCount;
       }
-      editCount = Math.max(serverEditCount, editCount);
     }
 
     await usersCol.updateOne(
       filter,
       {
         $set: {
-          username: profile.username.trim(),
-          fullName: profile.fullName?.trim() || profile.username.trim(),
+          username: cleanName,
+          fullName: cleanName,
           course: profile.course?.trim() || '',
           year: profile.year?.trim() || '',
           batch: profile.batch?.trim() || '',
-          rollNo: cleanRollNo,
-          email: profile.email?.trim() || '',
+          rollNo: cleanRollNo || (existing?.rollNo || ''),
+          email: profile.email?.trim() || (existing?.email || ''),
           editCount,
           lastIp: clientIp || '',
           updatedAt: new Date(),
@@ -225,7 +243,12 @@ export async function checkUsernameConflictInMongo(params: {
   year?: string;
   rollNo?: string;
   clientIp?: string;
-}): Promise<{ conflict: boolean; message?: string }> {
+}): Promise<{
+  conflict: boolean;
+  isExistingUser?: boolean;
+  message?: string;
+  existingProfile?: any;
+}> {
   try {
     const { db, status } = await connectToDatabase();
     if (!db || !status.connected) {
@@ -262,38 +285,42 @@ export async function checkUsernameConflictInMongo(params: {
 
     const allMatches = [...existingLeaderboard, ...existingUsers];
 
+    // Check for explicit conflicting roll numbers ONLY
     for (const match of allMatches) {
-      const matchBatch = (match.batch || '').trim().toLowerCase();
-      const matchYear = (match.year || '').trim().toLowerCase();
       const matchRoll = (match.rollNo || '').trim().toUpperCase();
 
-      const sameBatch = cleanBatch && matchBatch && cleanBatch.toLowerCase() === matchBatch;
-      const sameYear = cleanYear && matchYear && cleanYear.toLowerCase() === matchYear;
-
-      // Conflict if in the same semester or batch within this course
-      if (sameBatch || sameYear || (!cleanBatch && !matchBatch && (sameYear || !cleanYear))) {
-        // If both have identical roll number, it is the same student revisiting
-        if (cleanRollNo && matchRoll && cleanRollNo === matchRoll) {
-          continue;
-        }
-
-        // If from the same IP and no conflicting roll number, allow self-edits
-        if (params.clientIp && (match.clientIp === params.clientIp || match.lastIp === params.clientIp)) {
-          if (!cleanRollNo || !matchRoll || cleanRollNo === matchRoll) {
-            continue;
-          }
-        }
-
+      // Only if BOTH have non-empty roll numbers AND they differ, is there a genuine collision
+      // between two different students who happen to share the same name in this course.
+      if (cleanRollNo && matchRoll && cleanRollNo !== matchRoll) {
         const dept = cleanCourse || 'this course';
-        const sem = matchYear || matchBatch || 'this batch';
+        const sem = match.year || match.batch || 'this batch';
         return {
           conflict: true,
-          message: `Participant "${cleanUsername}" is already registered in ${dept} (${sem}). To avoid duplicate names on the leaderboard, please use your unique full name or add an initial / roll number (e.g., "${cleanUsername} K.").`,
+          message: `Another participant named "${cleanUsername}" with Roll No "${matchRoll}" is already registered in ${dept} (${sem}). Please add an initial or verify your roll number.`,
         };
       }
     }
 
-    return { conflict: false };
+    // If matching participant exists, they are the SAME returning user!
+    if (allMatches.length > 0) {
+      const firstMatch = allMatches[0];
+      return {
+        conflict: false,
+        isExistingUser: true,
+        message: `Welcome back, ${cleanUsername}!`,
+        existingProfile: {
+          username: firstMatch.username || cleanUsername,
+          fullName: firstMatch.fullName || firstMatch.username || cleanUsername,
+          course: firstMatch.course || cleanCourse,
+          year: firstMatch.year || cleanYear,
+          batch: firstMatch.batch || cleanBatch,
+          rollNo: firstMatch.rollNo || cleanRollNo,
+        },
+      };
+    }
+
+    // Brand new user registration
+    return { conflict: false, isExistingUser: false };
   } catch (err: any) {
     console.error('Error in checkUsernameConflictInMongo:', err?.message);
     return { conflict: false };

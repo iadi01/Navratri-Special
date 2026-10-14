@@ -175,13 +175,13 @@ function Quiz() {
     const candidateName = profile?.fullName || profile?.username || '';
     const candidateRoll = profile?.rollNo || '';
 
-    if (profile) {
+    if (profile && (profile.fullName?.trim() || profile.username?.trim())) {
       setPlayerName(candidateName);
       setCourse(profile.course || 'BCA');
       setYear(profile.year || '1st Sem');
       setBatch(profile.batch || '');
       setRollNo(candidateRoll);
-      setIsEditingProfile(!profile.fullName);
+      setIsEditingProfile(false);
     } else {
       setIsEditingProfile(true);
     }
@@ -328,44 +328,43 @@ function Quiz() {
       return;
     }
 
-    // Check if another participant in this batch/course already registered with the same name
+    // Check if another participant in this batch/course already registered with conflicting roll number
     const isSameProfileAsBefore =
       userProfile?.fullName?.trim().toLowerCase() === cleanName.toLowerCase() &&
       userProfile?.course === course.trim() &&
       userProfile?.year === year.trim();
 
+    let rollToSave = (userProfile?.rollNo || rollNo || '').trim();
+    let batchToSave = batch.trim();
+
     if (!isSameProfileAsBefore) {
       try {
         const checkRes = await fetch(
-          `/api/users/check-username?username=${encodeURIComponent(cleanName)}&course=${encodeURIComponent(course.trim())}&batch=${encodeURIComponent(batch.trim())}&year=${encodeURIComponent(year.trim())}&rollNo=${encodeURIComponent((userProfile?.rollNo || rollNo).trim())}`
+          `/api/users/check-username?username=${encodeURIComponent(cleanName)}&course=${encodeURIComponent(course.trim())}&batch=${encodeURIComponent(batch.trim())}&year=${encodeURIComponent(year.trim())}&rollNo=${encodeURIComponent(rollToSave)}`
         );
         if (checkRes.ok) {
           const conflictData = await checkRes.json();
           if (conflictData.conflict) {
             setProfileError(
               conflictData.message ||
-                `A participant named "${cleanName}" is already registered in ${course} (${year}). To prevent duplicate names on the leaderboard, please use your unique full name or add an initial / roll number.`
+                `A participant named "${cleanName}" is already registered. If this is you, please verify your details.`
             );
             return;
           }
+          // If server verified existing user, restore any stored fields
+          if (conflictData.isExistingUser && conflictData.existingProfile) {
+            if (conflictData.existingProfile.rollNo && !rollToSave) {
+              rollToSave = conflictData.existingProfile.rollNo;
+              setRollNo(rollToSave);
+            }
+            if (conflictData.existingProfile.batch && !batchToSave) {
+              batchToSave = conflictData.existingProfile.batch;
+              setBatch(batchToSave);
+            }
+          }
         }
       } catch {
-        // Fallback: check local storage leaderboard cache
-        const localCached = readLeaderboardFromStorage();
-        const conflict = localCached.find(
-          e =>
-            (e.fullName?.trim().toLowerCase() === cleanName.toLowerCase() ||
-              e.username.trim().toLowerCase() === cleanName.toLowerCase()) &&
-            e.course?.trim().toLowerCase() === course.trim().toLowerCase() &&
-            (e.year?.trim().toLowerCase() === year.trim().toLowerCase() ||
-              (batch && e.batch?.trim().toLowerCase() === batch.trim().toLowerCase()))
-        );
-        if (conflict) {
-          setProfileError(
-            `A participant named "${cleanName}" is already registered in ${course} (${year}). To prevent duplicate names on the leaderboard, please use your unique full name or add an initial / roll number.`
-          );
-          return;
-        }
+        // Network fallback: allow user to proceed without blocking
       }
     }
 
@@ -374,7 +373,8 @@ function Quiz() {
       username: cleanName,
       course: course.trim(),
       year: year.trim(),
-      batch: batch.trim(),
+      batch: batchToSave,
+      rollNo: rollToSave,
     });
 
     if (!res.success) {
