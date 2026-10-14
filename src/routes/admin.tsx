@@ -27,6 +27,10 @@ import {
   Zap,
   Edit3,
   Save,
+  XCircle,
+  AlertTriangle,
+  Check,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -964,118 +968,178 @@ function AdminPage() {
                   {selectedStudent.dayBreakdown.map((db) => {
                     const quiz = DAILY_QUIZZES.find(q => q.day === db.day);
                     const maxPts = db.day === 10 ? 100 : 30;
+                    const hasDetailedAnswers = Array.isArray(db.answers) && db.answers.length > 0;
+                    const totalQuestions = hasDetailedAnswers ? db.answers!.length : (quiz?.questions?.length || 3);
+                    const wrongCount = hasDetailedAnswers
+                      ? db.answers!.filter(a => !a.isCorrect).length
+                      : Math.max(0, totalQuestions - (db.firstTryCount ?? totalQuestions));
+                    const hasMistakes = wrongCount > 0;
+
                     return (
                       <div
                         key={db.day}
-                        className="bg-muted/40 border border-border rounded-xl p-3.5 space-y-2.5 text-xs"
+                        className={`border rounded-2xl p-4 space-y-3.5 transition-all text-xs ${
+                          hasMistakes
+                            ? 'bg-rose-500/[0.03] dark:bg-rose-950/[0.08] border-rose-500/25 shadow-xs'
+                            : 'bg-card border-border/80'
+                        }`}
                       >
                         {/* Day Card Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-3">
                           <div>
                             <div className="font-extrabold text-foreground flex items-center gap-1.5 text-sm">
-                              <Calendar size={13} className="text-primary" />
-                              Day {String(db.day).padStart(2, '0')}: {quiz?.title || `Quiz Chapter ${db.day}`}
+                              <Calendar size={14} className="text-primary" />
+                              <span>Day {String(db.day).padStart(2, '0')}: {quiz?.title || `Quiz Chapter ${db.day}`}</span>
                             </div>
-                            <span className="text-[10px] text-muted-foreground">
-                              Submitted: {new Date(db.submittedAt).toLocaleString()}
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Timer size={10} /> Submitted: {new Date(db.submittedAt).toLocaleString()}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="px-2 py-0.5 rounded-md text-xs font-black bg-primary/10 text-primary border border-primary/20">
+                            {/* Accuracy Status Badge */}
+                            {hasMistakes ? (
+                              <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1 shadow-xs">
+                                <AlertTriangle size={12} className="text-rose-500" />
+                                {wrongCount} Wrong Answer{wrongCount > 1 ? 's' : ''} ({totalQuestions - wrongCount}/{totalQuestions} Correct)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-xs">
+                                <Sparkles size={12} className="text-emerald-500" />
+                                All {totalQuestions} Correct (100%)
+                              </span>
+                            )}
+
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-primary/10 text-primary border border-primary/20">
                               {db.points}/{maxPts} pts
                             </span>
-                            <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-muted text-emerald-600 dark:text-emerald-400 border border-border">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-muted text-emerald-600 dark:text-emerald-400 border border-border">
                               ⚡ {db.timeSeconds}s
                             </span>
-                            <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-muted text-muted-foreground border border-border">
-                              {db.firstTryCount}/{quiz?.questions?.length || 3} First Try
-                            </span>
+
                             {isMainAdmin && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6 text-[11px] px-2 font-bold gap-1 text-primary hover:bg-primary/10 border-primary/30"
+                                className="h-7 text-xs px-2.5 font-bold gap-1 text-primary hover:bg-primary/10 border-primary/30"
                                 onClick={() => handleStartEditStudent(selectedStudent, db.day)}
                               >
-                                <Edit3 size={11} /> Edit Day {db.day} Marks
+                                <Edit3 size={12} /> Edit Day {db.day} Marks
                               </Button>
                             )}
                           </div>
                         </div>
 
                         {/* Question-wise Answers & Correct/Wrong Breakdown */}
-                        {db.answers && db.answers.length > 0 ? (
-                          <div className="space-y-2 pt-1">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
-                              Question-by-Question Response Log:
-                            </span>
-                            <div className="space-y-2">
-                              {db.answers.map((ans, aIdx) => (
-                                <div
-                                  key={ans.questionId || aIdx}
-                                  className="bg-card p-2.5 rounded-lg border border-border/80 text-xs space-y-1.5"
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <span className="font-semibold text-foreground text-xs leading-relaxed">
-                                      <strong className="text-primary font-mono mr-1">Q{ans.questionNumber || aIdx + 1}.</strong>
-                                      {ans.clue || quiz?.questions?.[aIdx]?.clue || 'Question'}
-                                    </span>
-                                    {ans.isCorrect ? (
-                                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                                        <CheckCircle2 size={11} /> Correct
-                                      </span>
+                        {hasDetailedAnswers ? (
+                          <div className="space-y-2.5 pt-1">
+                            <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                              <span>Question Responses Breakdown ({db.answers!.length} Questions):</span>
+                              <span className={hasMistakes ? 'text-rose-500 font-black' : 'text-emerald-500 font-black'}>
+                                {hasMistakes ? `${wrongCount} Mistake(s) Detected` : 'All 3 Answered Correctly'}
+                              </span>
+                            </div>
+
+                            <div className="space-y-2.5">
+                              {db.answers!.map((ans, aIdx) => {
+                                const isWrong = !ans.isCorrect;
+                                return (
+                                  <div
+                                    key={ans.questionId || aIdx}
+                                    className={`rounded-xl p-3.5 space-y-2.5 border transition-all ${
+                                      isWrong
+                                        ? 'bg-rose-500/[0.08] dark:bg-rose-950/30 border-rose-500/40 shadow-xs'
+                                        : 'bg-card border-border/80'
+                                    }`}
+                                  >
+                                    {/* Question header row */}
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="space-y-1 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider font-mono ${
+                                            isWrong
+                                              ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                                              : 'bg-primary/10 text-primary border border-primary/20'
+                                          }`}>
+                                            Question {ans.questionNumber || aIdx + 1}
+                                          </span>
+                                          {isWrong ? (
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                                              <XCircle size={13} className="text-rose-500" /> INCORRECT CHOICE (0 pts)
+                                            </span>
+                                          ) : (
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                              <CheckCircle2 size={13} className="text-emerald-500" /> CORRECT ON 1ST TRY (+10 pts)
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-xs font-semibold text-foreground leading-relaxed pt-0.5">
+                                          {ans.clue || quiz?.questions?.[aIdx]?.clue || 'Question clue'}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* High contrast comparison / answer section */}
+                                    {isWrong ? (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                        {/* What user answered wrongly */}
+                                        <div className="bg-rose-500/15 border border-rose-500/35 rounded-xl p-2.5 space-y-1">
+                                          <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                                            <X size={12} strokeWidth={3} className="text-rose-600 dark:text-rose-400" />
+                                            Student's Wrong Choice:
+                                          </div>
+                                          <div className="font-mono font-black text-xs text-rose-800 dark:text-rose-200 line-through decoration-rose-600 decoration-2 break-words">
+                                            {ans.selectedOption || '(None / Skipped)'}
+                                          </div>
+                                        </div>
+
+                                        {/* What the correct answer actually is */}
+                                        <div className="bg-emerald-500/15 border border-emerald-500/35 rounded-xl p-2.5 space-y-1">
+                                          <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                            <Check size={12} strokeWidth={3} className="text-emerald-600 dark:text-emerald-400" />
+                                            Correct Answer / Solution:
+                                          </div>
+                                          <div className="font-mono font-black text-xs text-emerald-800 dark:text-emerald-200 break-words">
+                                            {ans.correctAnswer}
+                                          </div>
+                                        </div>
+                                      </div>
                                     ) : (
-                                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30 flex items-center gap-1">
-                                        <X size={11} /> Wrong
-                                      </span>
+                                      <div className="flex items-center gap-2 pt-0.5 text-xs bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+                                        <span className="text-muted-foreground text-[11px] font-semibold">Student Answered:</span>
+                                        <span className="font-mono font-black text-emerald-700 dark:text-emerald-300">
+                                          {ans.selectedOption}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-emerald-600/80 ml-auto flex items-center gap-1">
+                                          <Check size={11} strokeWidth={3} /> Verified Correct
+                                        </span>
+                                      </div>
                                     )}
                                   </div>
-
-                                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs">
-                                    <span className="text-muted-foreground font-medium text-[11px]">Given Answer:</span>
-                                    <span
-                                      className={`px-2 py-0.5 rounded font-mono font-bold text-xs border ${
-                                        ans.isCorrect
-                                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25'
-                                          : 'bg-destructive/10 text-destructive border-destructive/25 line-through'
-                                      }`}
-                                    >
-                                      {ans.selectedOption}
-                                    </span>
-
-                                    {!ans.isCorrect && (
-                                      <>
-                                        <span className="text-muted-foreground font-medium text-[11px] ml-1">
-                                          Correct Solution:
-                                        </span>
-                                        <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                          {ans.correctAnswer}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         ) : (
-                          <div className="bg-card p-2.5 rounded-lg border border-border/80 text-xs space-y-1.5">
-                            <div className="flex items-center justify-between text-[11px]">
+                          <div className="bg-card p-3.5 rounded-xl border border-border/80 text-xs space-y-2">
+                            <div className="flex items-center justify-between text-[11px] pb-1 border-b border-border/50">
                               <span className="font-semibold text-foreground">
                                 Score: <strong className="text-primary font-mono">{db.points} pts</strong> ({db.firstTryCount}/{quiz?.questions?.length || 3} first attempt)
                               </span>
                               <span className="text-[10px] text-muted-foreground italic">
-                                Detailed answer log active for all upcoming submissions
+                                Detailed option logging active for upcoming submissions
                               </span>
                             </div>
-                            <div className="space-y-1 pt-1 border-t border-border/40">
+                            <div className="space-y-1.5 pt-1">
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">
+                                Quiz Solution Key:
+                              </span>
                               {quiz?.questions?.map((q, qIdx) => (
-                                <div key={q.id || qIdx} className="flex items-center justify-between gap-2 text-[11px]">
+                                <div key={q.id || qIdx} className="flex items-center justify-between gap-3 text-[11px] p-2 rounded-lg bg-muted/40 border border-border/40">
                                   <span className="text-muted-foreground truncate max-w-[320px]">
-                                    Q{qIdx + 1}: {q.clue}
+                                    <strong className="text-foreground mr-1 font-mono">Q{qIdx + 1}:</strong> {q.clue}
                                   </span>
-                                  <span className="shrink-0 font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                                  <span className="shrink-0 font-bold text-emerald-600 dark:text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
                                     Answer: {q.answer}
                                   </span>
                                 </div>
