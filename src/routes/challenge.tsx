@@ -43,6 +43,7 @@ import {
   clearQuizProgress,
   readLeaderboardFromStorage,
   type UserProfile,
+  type UserAnswerRecord,
 } from '@/lib/leaderboard-store';
 
 const BEST_KEY_PREFIX = 'pehchaan-kaun-best-day-';
@@ -115,6 +116,7 @@ function Quiz() {
   const firstTryCountRef = useRef<number>(0);
   const [timeTaken, setTimeTaken] = useState<number>(0);
   const [firstTryCount, setFirstTryCount] = useState<number>(0);
+  const userAnswersRef = useRef<UserAnswerRecord[]>([]);
 
   // Participant profile states
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getSavedUserProfile());
@@ -165,6 +167,7 @@ function Quiz() {
     setPoints(0);
     setTimeTaken(0);
     setFirstTryCount(0);
+    userAnswersRef.current = [];
     setSubmissionResult(null);
 
     const profile = getSavedUserProfile();
@@ -235,6 +238,7 @@ function Quiz() {
                 setIndex(savedProgress.index);
                 setPoints(savedProgress.points || 0);
                 setFirstTryCount(savedProgress.firstTryCount || 0);
+                userAnswersRef.current = savedProgress.answers || [];
                 const elapsed = savedProgress.elapsedSeconds || 0;
                 setTimeTaken(elapsed);
                 startTimeRef.current = Date.now() - (elapsed * 1000);
@@ -255,6 +259,7 @@ function Quiz() {
           setIndex(savedProgress.index);
           setPoints(savedProgress.points || 0);
           setFirstTryCount(savedProgress.firstTryCount || 0);
+          userAnswersRef.current = savedProgress.answers || [];
           const elapsed = savedProgress.elapsedSeconds || 0;
           setTimeTaken(elapsed);
           startTimeRef.current = Date.now() - (elapsed * 1000);
@@ -274,6 +279,7 @@ function Quiz() {
       pointsRef.current = saved.points || 0;
       setFirstTryCount(saved.firstTryCount || 0);
       firstTryCountRef.current = saved.firstTryCount || 0;
+      userAnswersRef.current = saved.answers || [];
       const elapsed = saved.elapsedSeconds || 0;
       setTimeTaken(elapsed);
       startTimeRef.current = Date.now() - (elapsed * 1000);
@@ -300,6 +306,7 @@ function Quiz() {
     setTimeTaken(0);
     setFirstTryCount(0);
     firstTryCountRef.current = 0;
+    userAnswersRef.current = [];
     setSubmissionResult(null);
 
     saveQuizProgress(targetDay, {
@@ -434,6 +441,22 @@ function Quiz() {
     // Case-insensitive & trimmed comparison to guarantee 100% reliable answer matching
     const isAnswerCorrect = option.trim().toLowerCase() === q.answer.trim().toLowerCase();
 
+    // 📝 Record answer details
+    const answerRecord: UserAnswerRecord = {
+      questionId: q.id,
+      questionNumber: index + 1,
+      clue: q.clue,
+      selectedOption: option,
+      correctAnswer: q.answer,
+      isCorrect: isAnswerCorrect,
+    };
+    const existIdx = userAnswersRef.current.findIndex(a => a.questionId === q.id || a.questionNumber === index + 1);
+    if (existIdx >= 0) {
+      userAnswersRef.current[existIdx] = answerRecord;
+    } else {
+      userAnswersRef.current.push(answerRecord);
+    }
+
     if (isAnswerCorrect) {
       setIsCorrect(true);
       setSolved(true);
@@ -449,6 +472,7 @@ function Quiz() {
         points: newPoints,
         firstTryCount: newFirstTry,
         elapsedSeconds: currentElapsed,
+        answers: userAnswersRef.current,
       });
 
       // Auto advance to next question after 1.8s
@@ -465,6 +489,7 @@ function Quiz() {
         points: pointsRef.current,
         firstTryCount: firstTryCountRef.current,
         elapsedSeconds: currentElapsed,
+        answers: userAnswersRef.current,
       });
 
       // Auto advance to next question after 2.0s (no 2nd chance!)
@@ -530,6 +555,7 @@ function Quiz() {
         timeSeconds: elapsedSeconds,
         firstTryCount: finalFirstTry,
         totalQuestions: questions.length,
+        answers: userAnswersRef.current,
       });
 
       setSubmissionResult({ submitted: true, rank: subRes.rank, autoSaved: true });
@@ -544,6 +570,7 @@ function Quiz() {
       points: pointsRef.current,
       firstTryCount: firstTryCountRef.current,
       elapsedSeconds: currentElapsed,
+      answers: userAnswersRef.current,
     });
 
     setTimeout(() => {

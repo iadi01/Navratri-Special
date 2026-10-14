@@ -1,3 +1,12 @@
+export type UserAnswerRecord = {
+  questionId: string;
+  questionNumber: number;
+  clue?: string;
+  selectedOption: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+};
+
 export type LeaderboardEntry = {
   id: string;
   username: string;
@@ -14,6 +23,7 @@ export type LeaderboardEntry = {
   totalQuestions: number;
   submittedAt: string;
   clientIp?: string;
+  answers?: UserAnswerRecord[];
 };
 
 export type OverallLeaderboardEntry = {
@@ -37,6 +47,7 @@ export type OverallLeaderboardEntry = {
     timeSeconds: number;
     firstTryCount: number;
     submittedAt: string;
+    answers?: UserAnswerRecord[];
   }[];
 };
 
@@ -240,6 +251,7 @@ export type QuizProgress = {
   firstTryCount: number;
   elapsedSeconds: number;
   updatedAt: number;
+  answers?: UserAnswerRecord[];
 };
 
 export function getQuizProgress(day: number): QuizProgress | null {
@@ -457,6 +469,7 @@ export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboar
         timeSeconds: score.timeSeconds,
         firstTryCount: score.firstTryCount,
         submittedAt: score.submittedAt,
+        answers: score.answers,
       });
     }
 
@@ -501,6 +514,7 @@ export function submitLeaderboardScore(params: {
   timeSeconds: number;
   firstTryCount: number;
   totalQuestions: number;
+  answers?: UserAnswerRecord[];
 }): { success: boolean; entry: LeaderboardEntry; rank: number } {
   const all = readLeaderboardFromStorage();
   const cleanUsername = params.username.trim() || 'Anonymous Explorer';
@@ -541,6 +555,7 @@ export function submitLeaderboardScore(params: {
     firstTryCount: Math.min(params.firstTryCount, params.day === 10 ? 10 : 3),
     totalQuestions: params.totalQuestions || (params.day === 10 ? 10 : 3),
     submittedAt: new Date().toISOString(),
+    answers: params.answers,
   };
 
   const updated = [...all, newEntry];

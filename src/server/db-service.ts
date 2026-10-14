@@ -68,6 +68,7 @@ export async function saveScoreToMongo(
       clientIp: clientIp || entry.clientIp || '',
       submittedAt: entry.submittedAt || now.toISOString(),
       createdAt: now,
+      answers: Array.isArray(entry.answers) ? entry.answers : [],
     });
 
     // 2. Save / Upsert user profile into users collection
@@ -382,6 +383,7 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       totalQuestions: r.totalQuestions || (r.day === 10 ? 10 : 3),
       submittedAt: r.submittedAt || (r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString()),
       clientIp: r.clientIp || '',
+      answers: Array.isArray(r.answers) ? r.answers : undefined,
     }));
   } catch (err: any) {
     console.error('Failed to get scores from MongoDB:', err?.message);
@@ -663,8 +665,47 @@ export async function updateScoreInMongo(params: {
       if (params.day) filter.day = Number(params.day);
     }
 
-    const existing = await leaderboardCol.findOne(filter);
-    if (!existing) {
+    let existing = await leaderboardCol.findOne(filter);
+    if (!existing && params.username && params.day) {
+      const esc = params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const userProfile =
+        (await leaderboardCol.findOne({
+          username: { $regex: new RegExp(`^${esc}$`, 'i') },
+        })) ||
+        (await usersCol.findOne({
+          username: { $regex: new RegExp(`^${esc}$`, 'i') },
+        }));
+
+      const cleanDay = Number(params.day);
+      const newEntryId = params.id || `entry-admin-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const newRecord: any = {
+        id: newEntryId,
+        username: params.username.trim(),
+        fullName: params.fullName?.trim() || userProfile?.fullName || params.username.trim(),
+        course: params.course?.trim() || userProfile?.course || '',
+        year: params.year?.trim() || userProfile?.year || '',
+        batch: params.batch !== undefined ? params.batch.trim() : (userProfile?.batch || ''),
+        rollNo: params.rollNo || userProfile?.rollNo || '',
+        email: userProfile?.email || '',
+        day: cleanDay,
+        points: typeof params.points === 'number' ? Number(params.points) : 0,
+        timeSeconds: typeof params.timeSeconds === 'number' ? Number(params.timeSeconds) : 0,
+        firstTryCount:
+          typeof params.firstTryCount === 'number'
+            ? Number(params.firstTryCount)
+            : params.points
+            ? Math.min(Math.floor(params.points / 10), cleanDay === 10 ? 10 : 3)
+            : 0,
+        totalQuestions: cleanDay === 10 ? 10 : 3,
+        clientIp: 'Admin Panel',
+        submittedAt: new Date().toISOString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        answers: [],
+      };
+      await leaderboardCol.insertOne(newRecord);
+      existing = newRecord;
+    } else if (!existing) {
       return { success: false, error: 'Score record not found.' };
     }
 

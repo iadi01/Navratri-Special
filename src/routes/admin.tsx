@@ -101,6 +101,7 @@ function AdminPage() {
     points: number;
     timeSeconds: number;
     firstTryCount: number;
+    studentRef?: OverallLeaderboardEntry;
   } | null>(null);
   const [isSavingStudent, setIsSavingStudent] = useState(false);
   const [studentActionMsg, setStudentActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -221,8 +222,9 @@ function AdminPage() {
     }
   };
 
-  const handleStartEditStudent = (st: OverallLeaderboardEntry) => {
-    const day1Score = st.dayBreakdown?.[0] || { points: st.totalPoints, timeSeconds: st.totalTimeSeconds, firstTryCount: 3, day: 1 };
+  const handleStartEditStudent = (st: OverallLeaderboardEntry, targetDay?: number) => {
+    const dayToUse = targetDay || st.dayBreakdown?.[0]?.day || 1;
+    const dayScore = st.dayBreakdown?.find(d => d.day === dayToUse);
     setEditingStudent({
       username: st.username,
       fullName: st.fullName || st.username,
@@ -230,10 +232,11 @@ function AdminPage() {
       year: st.year && st.year !== 'Not specified' ? st.year : '1st Sem',
       batch: st.batch && st.batch !== 'Not specified' ? st.batch : '',
       rollNo: st.rollNo !== '-' && st.rollNo !== 'N/A' ? (st.rollNo || '') : '',
-      day: day1Score.day || 1,
-      points: day1Score.points ?? st.totalPoints,
-      timeSeconds: day1Score.timeSeconds ?? st.totalTimeSeconds,
-      firstTryCount: day1Score.firstTryCount ?? 3,
+      day: dayToUse,
+      points: dayScore?.points ?? 0,
+      timeSeconds: dayScore?.timeSeconds ?? 0,
+      firstTryCount: dayScore?.firstTryCount ?? 3,
+      studentRef: st,
     });
     setStudentActionMsg(null);
   };
@@ -250,6 +253,7 @@ function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...editingStudent,
+          day: Number(editingStudent.day),
           points: Number(editingStudent.points),
           timeSeconds: Number(editingStudent.timeSeconds),
           firstTryCount: Number(editingStudent.firstTryCount),
@@ -257,13 +261,20 @@ function AdminPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setStudentActionMsg({ type: 'success', text: `Details for "${editingStudent.fullName}" successfully updated in database!` });
+        setStudentActionMsg({
+          type: 'success',
+          text: `Day ${editingStudent.day} marks and details for "${editingStudent.fullName}" successfully updated in database!`,
+        });
         await syncLeaderboardWithServer();
-        setParticipants(getOverallLeaderboard());
-        setEditingStudent(null);
+        const updatedList = getOverallLeaderboard();
+        setParticipants(updatedList);
         if (selectedStudent?.username === editingStudent.username) {
-          setSelectedStudent(null);
+          const updatedSelected = updatedList.find(p => p.username === editingStudent.username);
+          if (updatedSelected) {
+            setSelectedStudent(updatedSelected);
+          }
         }
+        setEditingStudent(null);
       } else {
         setStudentActionMsg({ type: 'error', text: data.error || 'Failed to update student score.' });
       }
@@ -849,7 +860,7 @@ function AdminPage() {
       {/* STUDENT DETAIL MODAL */}
       {selectedStudent && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-card border border-border rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary/10 text-primary text-lg font-bold flex items-center justify-center">
@@ -919,6 +930,164 @@ function AdminPage() {
                   {selectedStudent.daysCompleted}/10
                 </strong>
               </div>
+            </div>
+
+            {/* 📝 DAY-WISE ANSWERS & SCORE LOG */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                  <Layers size={14} /> Day-wise Quiz Responses &amp; Accuracy
+                </span>
+                <span className="text-[11px] font-mono font-bold text-muted-foreground">
+                  {selectedStudent.dayBreakdown?.length || 0} Day(s) Recorded
+                </span>
+              </div>
+
+              {(!selectedStudent.dayBreakdown || selectedStudent.dayBreakdown.length === 0) ? (
+                <div className="text-center py-6 bg-muted/30 rounded-xl border border-dashed border-border text-xs text-muted-foreground">
+                  No daily quiz attempts recorded yet for this participant.
+                  {isMainAdmin && (
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs font-bold gap-1 text-primary border-primary/30"
+                        onClick={() => handleStartEditStudent(selectedStudent, 1)}
+                      >
+                        <Edit3 size={12} /> Assign Day 1 Marks
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedStudent.dayBreakdown.map((db) => {
+                    const quiz = DAILY_QUIZZES.find(q => q.day === db.day);
+                    const maxPts = db.day === 10 ? 100 : 30;
+                    return (
+                      <div
+                        key={db.day}
+                        className="bg-muted/40 border border-border rounded-xl p-3.5 space-y-2.5 text-xs"
+                      >
+                        {/* Day Card Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2">
+                          <div>
+                            <div className="font-extrabold text-foreground flex items-center gap-1.5 text-sm">
+                              <Calendar size={13} className="text-primary" />
+                              Day {String(db.day).padStart(2, '0')}: {quiz?.title || `Quiz Chapter ${db.day}`}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">
+                              Submitted: {new Date(db.submittedAt).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md text-xs font-black bg-primary/10 text-primary border border-primary/20">
+                              {db.points}/{maxPts} pts
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-muted text-emerald-600 dark:text-emerald-400 border border-border">
+                              ⚡ {db.timeSeconds}s
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-muted text-muted-foreground border border-border">
+                              {db.firstTryCount}/{quiz?.questions?.length || 3} First Try
+                            </span>
+                            {isMainAdmin && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[11px] px-2 font-bold gap-1 text-primary hover:bg-primary/10 border-primary/30"
+                                onClick={() => handleStartEditStudent(selectedStudent, db.day)}
+                              >
+                                <Edit3 size={11} /> Edit Day {db.day} Marks
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Question-wise Answers & Correct/Wrong Breakdown */}
+                        {db.answers && db.answers.length > 0 ? (
+                          <div className="space-y-2 pt-1">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
+                              Question-by-Question Response Log:
+                            </span>
+                            <div className="space-y-2">
+                              {db.answers.map((ans, aIdx) => (
+                                <div
+                                  key={ans.questionId || aIdx}
+                                  className="bg-card p-2.5 rounded-lg border border-border/80 text-xs space-y-1.5"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="font-semibold text-foreground text-xs leading-relaxed">
+                                      <strong className="text-primary font-mono mr-1">Q{ans.questionNumber || aIdx + 1}.</strong>
+                                      {ans.clue || quiz?.questions?.[aIdx]?.clue || 'Question'}
+                                    </span>
+                                    {ans.isCorrect ? (
+                                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                        <CheckCircle2 size={11} /> Correct
+                                      </span>
+                                    ) : (
+                                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30 flex items-center gap-1">
+                                        <X size={11} /> Wrong
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs">
+                                    <span className="text-muted-foreground font-medium text-[11px]">Given Answer:</span>
+                                    <span
+                                      className={`px-2 py-0.5 rounded font-mono font-bold text-xs border ${
+                                        ans.isCorrect
+                                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25'
+                                          : 'bg-destructive/10 text-destructive border-destructive/25 line-through'
+                                      }`}
+                                    >
+                                      {ans.selectedOption}
+                                    </span>
+
+                                    {!ans.isCorrect && (
+                                      <>
+                                        <span className="text-muted-foreground font-medium text-[11px] ml-1">
+                                          Correct Solution:
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                          {ans.correctAnswer}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-card p-2.5 rounded-lg border border-border/80 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-semibold text-foreground">
+                                Score: <strong className="text-primary font-mono">{db.points} pts</strong> ({db.firstTryCount}/{quiz?.questions?.length || 3} first attempt)
+                              </span>
+                              <span className="text-[10px] text-muted-foreground italic">
+                                Detailed answer log active for all upcoming submissions
+                              </span>
+                            </div>
+                            <div className="space-y-1 pt-1 border-t border-border/40">
+                              {quiz?.questions?.map((q, qIdx) => (
+                                <div key={q.id || qIdx} className="flex items-center justify-between gap-2 text-[11px]">
+                                  <span className="text-muted-foreground truncate max-w-[320px]">
+                                    Q{qIdx + 1}: {q.clue}
+                                  </span>
+                                  <span className="shrink-0 font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                                    Answer: {q.answer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pt-1">
@@ -996,16 +1165,76 @@ function AdminPage() {
                 />
               </div>
 
+              {/* 📅 Daily Marks Day Selector (Main Admin) */}
+              {isMainAdmin && (
+                <div className="space-y-1.5 bg-muted/60 p-3 rounded-xl border border-border">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-foreground flex items-center gap-1.5">
+                      <Calendar size={13} className="text-primary" /> Daily Marks Selection:
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-primary">
+                      Editing Day {String(editingStudent.day).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Click any day below to view or edit that specific day's marks:
+                  </p>
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-1 pt-1">
+                    {DAILY_QUIZZES.map((q) => {
+                      const isCurrent = editingStudent.day === q.day;
+                      const currentSt = editingStudent.studentRef || participants.find(p => p.username === editingStudent.username);
+                      const dayScore = currentSt?.dayBreakdown?.find(d => d.day === q.day);
+                      const hasAttempted = !!dayScore;
+                      return (
+                        <button
+                          key={q.day}
+                          type="button"
+                          onClick={() => {
+                            setEditingStudent({
+                              ...editingStudent,
+                              day: q.day,
+                              points: dayScore?.points ?? 0,
+                              timeSeconds: dayScore?.timeSeconds ?? 0,
+                              firstTryCount: dayScore?.firstTryCount ?? 3,
+                            });
+                          }}
+                          className={`p-1.5 rounded-lg text-center border text-xs font-bold transition-all cursor-pointer relative ${
+                            isCurrent
+                              ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                              : hasAttempted
+                              ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20'
+                              : 'bg-background hover:bg-muted text-muted-foreground border-border'
+                          }`}
+                        >
+                          <span className="block text-[10px]">D{q.day}</span>
+                          {hasAttempted ? (
+                            <span className="block text-[9px] font-mono leading-none font-black truncate">
+                              {dayScore.points}p
+                            </span>
+                          ) : (
+                            <span className="block text-[9px] font-mono leading-none text-muted-foreground">
+                              0p
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Score / Marks & Time */}
               {isMainAdmin ? (
                 <div className="grid grid-cols-3 gap-2.5 bg-primary/5 p-3 rounded-xl border border-primary/20">
                   <div className="space-y-1">
-                    <Label htmlFor="edit-points" className="text-xs font-bold text-primary">Score (Points) *</Label>
+                    <Label htmlFor="edit-points" className="text-xs font-bold text-primary">
+                      Day {editingStudent.day} Score (Points) *
+                    </Label>
                     <Input
                       id="edit-points"
                       type="number"
                       min="0"
-                      max="100"
+                      max={editingStudent.day === 10 ? 100 : 30}
                       value={editingStudent.points}
                       onChange={e => setEditingStudent({ ...editingStudent, points: Number(e.target.value) })}
                       className="h-9 text-sm font-black text-primary font-mono"
@@ -1043,7 +1272,7 @@ function AdminPage() {
               ) : (
                 <div className="bg-muted/40 p-3 rounded-xl border border-border space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-muted-foreground">Quiz Score &amp; Marks</span>
+                    <span className="font-semibold text-muted-foreground">Day {editingStudent.day} Quiz Score &amp; Marks</span>
                     <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border flex items-center gap-1">
                       <Lock size={10} /> Numbers Locked
                     </span>
