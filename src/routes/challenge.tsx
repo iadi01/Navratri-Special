@@ -237,7 +237,9 @@ function Quiz() {
                 setStarted(true);
                 setIndex(savedProgress.index);
                 setPoints(savedProgress.points || 0);
+                pointsRef.current = savedProgress.points || 0;
                 setFirstTryCount(savedProgress.firstTryCount || 0);
+                firstTryCountRef.current = savedProgress.firstTryCount || 0;
                 userAnswersRef.current = savedProgress.answers || [];
                 const elapsed = savedProgress.elapsedSeconds || 0;
                 setTimeTaken(elapsed);
@@ -258,7 +260,9 @@ function Quiz() {
           setStarted(true);
           setIndex(savedProgress.index);
           setPoints(savedProgress.points || 0);
+          pointsRef.current = savedProgress.points || 0;
           setFirstTryCount(savedProgress.firstTryCount || 0);
+          firstTryCountRef.current = savedProgress.firstTryCount || 0;
           userAnswersRef.current = savedProgress.answers || [];
           const elapsed = savedProgress.elapsedSeconds || 0;
           setTimeTaken(elapsed);
@@ -536,9 +540,12 @@ function Quiz() {
       const currentRoll = (userProfile?.rollNo || rollNo).trim().toUpperCase();
       const currentName = (userProfile?.fullName || playerName).trim();
 
-      // No artificial participation points - true score is preserved!
-      const rawPoints = Math.min(Math.max(points, pointsRef.current), maxPoints);
-      const finalFirstTry = Math.min(Math.max(firstTryCount, firstTryCountRef.current), questions.length);
+      // Verify score against recorded answers to guarantee no correct answer is missed
+      const verifiedCorrect = userAnswersRef.current.filter(a => a.isCorrect).length;
+      const verifiedPoints = verifiedCorrect * POINTS_FIRST_TRY;
+
+      const rawPoints = Math.min(Math.max(points, pointsRef.current, verifiedPoints), maxPoints);
+      const finalFirstTry = Math.min(Math.max(firstTryCount, firstTryCountRef.current, verifiedCorrect), questions.length);
 
       setPoints(rawPoints);
       setFirstTryCount(finalFirstTry);
@@ -975,9 +982,10 @@ function Quiz() {
 
           <div className="quiz-options">
             {q.options.map((option, i) => {
-              const isAnswer = answered && option === q.answer;
-              const isSelectedWrong = answered && !isCorrect && option === selectedOption;
-              const isDim = answered && option !== q.answer && option !== selectedOption;
+              const isAnswer = answered && option.trim().toLowerCase() === q.answer.trim().toLowerCase();
+              const isSelected = option.trim().toLowerCase() === selectedOption?.trim().toLowerCase();
+              const isSelectedWrong = answered && !isCorrect && isSelected;
+              const isDim = answered && !isAnswer && !isSelected;
               return (
                 <Button
                   key={option}
