@@ -4,7 +4,6 @@ import {
   Trophy,
   Timer,
   RotateCcw,
-  Sparkles,
   ArrowRight,
   CheckCircle2,
   Lock,
@@ -82,12 +81,31 @@ const LEVELS = [
 ];
 
 const LOCAL_STORAGE_KEY = 'pehchaan_navratri_puzzle_v2';
+const SUBMITTED_CACHE_KEY = 'pehchaan_puzzle_submitted_date';
 
 function getTodayIST(): string {
   const d = new Date();
   const istOffset = 5.5 * 60 * 60 * 1000;
   const istDate = new Date(d.getTime() + istOffset);
   return istDate.toISOString().slice(0, 10);
+}
+
+function checkLocalAttemptSync(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const today = getTodayIST();
+    if (localStorage.getItem(SUBMITTED_CACHE_KEY) === today) {
+      return true;
+    }
+    const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedRaw) {
+      const parsed = JSON.parse(savedRaw);
+      if (parsed && parsed.date === today && parsed.submitted) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -163,7 +181,7 @@ function PuzzlePage() {
   const [yearInput, setYearInput] = useState<string>('1st Sem');
 
   // Attempt & Submission Status
-  const [hasAttemptedToday, setHasAttemptedToday] = useState<boolean>(false);
+  const [hasAttemptedToday, setHasAttemptedToday] = useState<boolean>(() => checkLocalAttemptSync());
   const [serverExistingScore, setServerExistingScore] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<{
@@ -174,6 +192,7 @@ function PuzzlePage() {
   } | null>(null);
 
   // Puzzle Board State
+  const [isGameActive, setIsGameActive] = useState<boolean>(false);
   const [currentLevelIdx, setCurrentLevelIdx] = useState<number>(0);
   const [unlockedLevel, setUnlockedLevel] = useState<number>(0);
   const [tiles, setTiles] = useState<number[]>([]);
@@ -202,7 +221,7 @@ function PuzzlePage() {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentLevel = LEVELS[currentLevelIdx] || LEVELS[0];
-  const totalLiveSeconds = accumulatedSeconds + sessionElapsed;
+  const totalLiveSeconds = accumulatedSeconds + (isGameActive ? sessionElapsed : 0);
 
   // 1. Fetch Admin Puzzle Config & Leaderboard
   useEffect(() => {
@@ -252,6 +271,7 @@ function PuzzlePage() {
         if (res.ok) {
           const data = await res.json();
           if (data.attempted) {
+            localStorage.setItem(SUBMITTED_CACHE_KEY, todayIST);
             setHasAttemptedToday(true);
             setServerExistingScore(data.existingScore);
           }
@@ -281,8 +301,7 @@ function PuzzlePage() {
           setLevelTimes(parsed.levelTimeSeconds ?? [0, 0, 0]);
           setLevelMovesArr(parsed.levelMoves ?? [0, 0, 0]);
           setDoneLevels(parsed.done ?? [false, false, false]);
-
-          sessionStartTsRef.current = Date.now();
+          // Note: isGameActive stays false on load/refresh until user clicks "Resume Play"!
           return;
         }
       }
@@ -290,9 +309,10 @@ function PuzzlePage() {
       console.warn('Error reading saved puzzle state:', e);
     }
 
-    // Fresh start for today
-    const freshTiles = generateSolvableTiles(LEVELS[0].cols, LEVELS[0].rows);
-    setTiles(freshTiles);
+    // Fresh start for today: show solved picture initially
+    const n = LEVELS[0].cols * LEVELS[0].rows;
+    const initialTiles = [...Array(n).keys()];
+    setTiles(initialTiles);
     setCurrentLevelIdx(0);
     setUnlockedLevel(0);
     setMoves(0);
@@ -301,12 +321,12 @@ function PuzzlePage() {
     setLevelTimes([0, 0, 0]);
     setLevelMovesArr([0, 0, 0]);
     setDoneLevels([false, false, false]);
-    sessionStartTsRef.current = Date.now();
+    setIsGameActive(false);
   }, [hasAttemptedToday, todayIST]);
 
-  // 4. Live Timer Tick & Auto-Save
+  // 4. Live Timer Tick (ONLY runs when isGameActive is true!)
   useEffect(() => {
-    if (hasAttemptedToday || doneLevels[currentLevelIdx] || isSubmitting) {
+    if (!isGameActive || hasAttemptedToday || doneLevels[currentLevelIdx] || isSubmitting) {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       return;
     }
@@ -319,14 +339,36 @@ function PuzzlePage() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [hasAttemptedToday, doneLevels, currentLevelIdx, isSubmitting]);
+  }, [isGameActive, hasAttemptedToday, doneLevels, currentLevelIdx, isSubmitting]);
+
+  // Start Play: auto-shuffles tiles and starts the timer!
+  const handleStartPlay = () => {
+    if (hasAttemptedToday) return;
+    const targetCols = currentLevel.cols;
+    const targetRows = currentLevel.rows;
+    const shuffled = generateSolvableTiles(targetCols, targetRows);
+    setTiles(shuffled);
+    setMoves(0);
+    setSessionElapsed(0);
+    sessionStartTsRef.current = Date.now();
+    setIsGameActive(true);
+    saveStateToStorage({ tiles: shuffled, moves: 0 });
+  };
+
+  // Resume Play: continues previous game with saved timer and moves!
+  const handleResumePlay = () => {
+    if (hasAttemptedToday) return;
+    setSessionElapsed(0);
+    sessionStartTsRef.current = Date.now();
+    setIsGameActive(true);
+  };
 
   // 5. Auto-Save State to LocalStorage on changes
   const saveStateToStorage = useCallback(
     (override?: Partial<PuzzleLocalState>) => {
       if (hasAttemptedToday) return;
       try {
-        const currentElapsedNow = Math.floor((Date.now() - sessionStartTsRef.current) / 1000);
+        const currentElapsedNow = isGameActive ? Math.max(0, Math.floor((Date.now() - sessionStartTsRef.current) / 1000)) : 0;
         const payload: PuzzleLocalState = {
           date: todayIST,
           level: currentLevelIdx,
@@ -345,6 +387,7 @@ function PuzzlePage() {
       } catch {}
     },
     [
+      isGameActive,
       todayIST,
       currentLevelIdx,
       unlockedLevel,
@@ -373,7 +416,7 @@ function PuzzlePage() {
 
   // 6. Handle Tile Movement
   const handleTileClick = (index: number) => {
-    if (hasAttemptedToday || doneLevels[currentLevelIdx]) return;
+    if (!isGameActive || hasAttemptedToday || doneLevels[currentLevelIdx]) return;
 
     const { cols } = currentLevel;
     const emptyIdx = tiles.indexOf(tiles.length - 1);
@@ -402,6 +445,7 @@ function PuzzlePage() {
 
   // 7. Handle Level Complete
   const handleLevelComplete = (solvedTiles: number[], finalMoves: number) => {
+    setIsGameActive(false); // Stop timer when level is complete
     const finalSessionSec = Math.floor((Date.now() - sessionStartTsRef.current) / 1000);
     const finalTotalSec = accumulatedSeconds + finalSessionSec;
 
@@ -466,6 +510,7 @@ function PuzzlePage() {
     setMoves(0);
     setSessionElapsed(0);
     sessionStartTsRef.current = Date.now();
+    setIsGameActive(true);
 
     saveStateToStorage({
       level: nextLevelIdx,
@@ -754,7 +799,7 @@ function PuzzlePage() {
               variant="outline"
               size="sm"
               onClick={handleReshuffle}
-              disabled={doneLevels[currentLevelIdx]}
+              disabled={!isGameActive || doneLevels[currentLevelIdx]}
               className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-amber-50"
             >
               <Shuffle size={13} className="mr-1" /> Reshuffle
@@ -762,7 +807,7 @@ function PuzzlePage() {
           </div>
 
           {/* Sliding Puzzle Grid */}
-          <div className="w-full max-w-[540px] mx-auto">
+          <div className="w-full max-w-[540px] mx-auto relative">
             <div
               className="grid gap-1.5 sm:gap-2 w-full border-3 border-[#1C332E] rounded-2xl p-2 sm:p-3 bg-[#1C332E] shadow-[5px_5px_0px_#B82348] select-none touch-manipulation"
               style={{
@@ -807,6 +852,42 @@ function PuzzlePage() {
                 );
               })}
             </div>
+
+            {/* Start / Resume Play Overlay */}
+            {!isGameActive && (
+              <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 text-center z-10 border-3 border-[#1C332E] shadow-[5px_5px_0px_#B82348] space-y-4">
+                <div className="text-4xl animate-bounce">{currentLevel.art}</div>
+                <div>
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-[#1C332E] font-['Baloo_2']">
+                    {moves > 0 || accumulatedSeconds > 0
+                      ? `Level ${currentLevelIdx + 1}: ${currentLevel.name} Paused`
+                      : `Level ${currentLevelIdx + 1}: ${currentLevel.name}`}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto mt-1 font-medium">
+                    {moves > 0 || accumulatedSeconds > 0
+                      ? `Saved: ${moves} moves · ${formatTime(totalLiveSeconds)}. Click Resume Play to continue!`
+                      : 'Click "Start Play" to shuffle tiles and begin the timer!'}
+                  </p>
+                </div>
+                {moves > 0 || accumulatedSeconds > 0 ? (
+                  <Button
+                    onClick={handleResumePlay}
+                    size="lg"
+                    className="bg-pink-600 hover:bg-pink-700 text-white font-extrabold text-base px-8 py-3 rounded-2xl border-3 border-[#1C332E] shadow-[4px_4px_0px_#1C332E] hover:shadow-[2px_2px_0px_#1C332E] transition-all cursor-pointer"
+                  >
+                    ▶️ Resume Play
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStartPlay}
+                    size="lg"
+                    className="bg-pink-600 hover:bg-pink-700 text-white font-extrabold text-base px-8 py-3 rounded-2xl border-3 border-[#1C332E] shadow-[4px_4px_0px_#1C332E] hover:shadow-[2px_2px_0px_#1C332E] transition-all cursor-pointer"
+                  >
+                    🎮 Start Play
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bottom Actions */}
@@ -860,9 +941,6 @@ function PuzzlePage() {
 
         {leaderboard.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground space-y-2">
-            <div className="w-12 h-12 mx-auto rounded-full bg-pink-50 border-2 border-[#1C332E] flex items-center justify-center text-pink-600 font-bold text-xl">
-              <Sparkles size={22} />
-            </div>
             <p className="font-semibold text-sm text-foreground">No puzzle submissions yet today!</p>
             <p className="text-xs max-w-sm mx-auto">
               Be the first to unscramble the tiles and claim the #1 spot with +50 Bonus Points!
