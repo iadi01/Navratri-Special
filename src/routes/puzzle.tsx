@@ -600,10 +600,17 @@ function PuzzlePage() {
     });
     setShowLevelModal(true);
 
-    // If last level (Hard) solved, trigger auto-submit!
-    if (isLast) {
-      submitPuzzleScore(3, finalTotalSec, newLevelMoves.reduce((a, b) => a + b, 0), newLevelTimes, newLevelMoves);
-    }
+    // 🌟 Auto-submit score to MongoDB immediately upon completing ANY level!
+    const countCompleted = currentLevelIdx + 1;
+    const finalMovesTotal = newLevelMoves.slice(0, countCompleted).reduce((a, b) => a + b, 0);
+    submitPuzzleScore(
+      countCompleted,
+      finalTotalSec,
+      finalMovesTotal,
+      newLevelTimes,
+      newLevelMoves,
+      { isFinalStop: isLast, openShareModal: isLast }
+    );
   };
 
   // 8. Switch to Next Level
@@ -647,7 +654,8 @@ function PuzzlePage() {
     finalTotalSeconds?: number,
     finalTotalMoves?: number,
     timesArr?: number[],
-    movesArr?: number[]
+    movesArr?: number[],
+    options?: { isFinalStop?: boolean; openShareModal?: boolean }
   ) => {
     let profile = getSavedUserProfile();
     if (!profile) {
@@ -698,7 +706,6 @@ function PuzzlePage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setHasAttemptedToday(true);
         setSubmissionResult(data);
         setServerExistingScore({
           completedLevels: count,
@@ -707,14 +714,31 @@ function PuzzlePage() {
           pointsEarned: data.pointsEarned ?? points,
           rank: data.rank,
         });
-        saveStateToStorage({ submitted: true });
+
+        const shouldLockOut = count >= 3 || options?.isFinalStop === true;
+        if (shouldLockOut) {
+          setHasAttemptedToday(true);
+          localStorage.setItem(SUBMITTED_CACHE_KEY, todayIST);
+          saveStateToStorage({ submitted: true });
+        } else {
+          // Partial level auto-submit (Level 1 or 2): Save in DB, keep next level open!
+          saveStateToStorage({ submitted: false, level: count, unlocked: count });
+        }
+
         fetchLeaderboard();
-        setShowShareModal(true);
+
+        if (options?.openShareModal || (shouldLockOut && options?.openShareModal !== false)) {
+          setShowShareModal(true);
+        }
       } else {
-        alert(data.error || 'Failed to submit puzzle score.');
+        if (options?.isFinalStop) {
+          alert(data.error || 'Failed to submit puzzle score.');
+        }
       }
     } catch (err: any) {
-      alert(err?.message || 'Network error submitting puzzle score.');
+      if (options?.isFinalStop) {
+        alert(err?.message || 'Network error submitting puzzle score.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1406,12 +1430,12 @@ function PuzzlePage() {
             </div>
 
             <div className="space-y-1">
-              <span className="inline-block text-xs font-bold uppercase tracking-wider px-3 py-1 bg-pink-100 text-pink-800 rounded-full border border-pink-300">
+              <span className="inline-block text-xs font-bold uppercase tracking-wider px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300">
                 {completedLevelInfo.isLast
-                  ? 'All 3 Levels Solved · +50 Points Earned!'
+                  ? 'All 3 Levels Solved · +50 Points Locked! 🏆'
                   : completedLevelInfo.level === 0
-                  ? 'Level 1 Solved · +15 Points Earned!'
-                  : 'Level 2 Solved · +30 Points Earned!'}
+                  ? 'Level 1 Complete · +15 Points Auto-Saved! ⚡'
+                  : 'Level 2 Complete · +30 Points Auto-Saved! ⚡'}
               </span>
               <h3 className="text-2xl sm:text-3xl font-extrabold text-[#1C332E] font-['Baloo_2']">
                 {completedLevelInfo.isLast
@@ -1431,8 +1455,8 @@ function PuzzlePage() {
                   <span className="font-mono text-sm">{completedLevelInfo.moves} moves</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Score</span>
-                  <span className="text-pink-600 text-sm font-extrabold">
+                  <span className="text-muted-foreground block text-[11px]">Score Saved</span>
+                  <span className="text-emerald-700 text-sm font-extrabold">
                     +{completedLevelInfo.level === 0 ? 15 : completedLevelInfo.level === 1 ? 30 : 50} PTS
                   </span>
                 </div>
@@ -1441,19 +1465,19 @@ function PuzzlePage() {
 
             <p className="text-xs sm:text-sm text-muted-foreground">
               {completedLevelInfo.isLast ? (
-                <>You mastered all 3 levels and earned <strong className="text-foreground">50 points</strong> — Shubh Navratri! 🌸</>
+                <>You mastered all 3 levels! Your official <strong className="text-foreground">50 points</strong> are saved in MongoDB. Shubh Navratri! 🌸</>
               ) : completedLevelInfo.level === 0 ? (
                 <>
-                  Cleared Level 1 for <strong className="text-foreground">15 Points</strong>.
-                  <span className="block mt-1 font-bold text-[#1C332E]">
-                    Play Medium (+15 pts) or submit now with 15 points?
+                  <strong className="text-emerald-700">+15 Points auto-submitted to MongoDB!</strong>
+                  <span className="block mt-1 font-medium text-foreground">
+                    Ready to take on Level 2 (Medium) for another +15 pts?
                   </span>
                 </>
               ) : (
                 <>
-                  Cleared Level 2 for <strong className="text-foreground">30 Points</strong>.
-                  <span className="block mt-1 font-bold text-[#1C332E]">
-                    Play Hard (+20 pts) or submit now with 30 points?
+                  <strong className="text-emerald-700">+30 Points auto-submitted to MongoDB!</strong>
+                  <span className="block mt-1 font-medium text-foreground">
+                    Continue to Level 3 (Hard) for 50 max points?
                   </span>
                 </>
               )}
@@ -1464,19 +1488,22 @@ function PuzzlePage() {
                 <>
                   <Button
                     onClick={() => proceedToNextLevel(completedLevelInfo.level + 1)}
-                    className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm py-2.5 px-3 rounded-xl cursor-pointer"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm py-3 px-3 rounded-xl cursor-pointer"
                   >
-                    Yes, Play {LEVELS[completedLevelInfo.level + 1].name}! 🌺 (+{completedLevelInfo.level === 0 ? 15 : 20} pts)
+                    Play Level {completedLevelInfo.level + 2} ({LEVELS[completedLevelInfo.level + 1].name}) 🌺 (+{completedLevelInfo.level === 0 ? 15 : 20} pts) →
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
                       setShowLevelModal(false);
-                      submitPuzzleScore(completedLevelInfo.level + 1);
+                      setHasAttemptedToday(true);
+                      localStorage.setItem(SUBMITTED_CACHE_KEY, todayIST);
+                      saveStateToStorage({ submitted: true });
+                      setShowShareModal(true);
                     }}
-                    className="w-full border-2 border-[#1C332E] font-bold text-xs py-2 px-3 rounded-xl hover:bg-amber-50 cursor-pointer text-muted-foreground hover:text-foreground"
+                    className="w-full border-2 border-[#1C332E] font-bold text-xs py-2 px-3 rounded-xl hover:bg-pink-50 cursor-pointer text-muted-foreground hover:text-pink-700"
                   >
-                    Stop & Submit ({completedLevelInfo.level === 0 ? '15 Points' : '30 Points'}) ✓
+                    Stop for Today · Keep {completedLevelInfo.level === 0 ? '15 Points' : '30 Points'} & View Sharecard ✓
                   </Button>
                 </>
               ) : (
