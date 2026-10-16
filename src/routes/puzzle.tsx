@@ -1140,6 +1140,7 @@ function PuzzlePage() {
                 const rows = currentLevel.rows;
                 const posX = (tileVal % cols) * (100 / (cols - 1));
                 const posY = Math.floor(tileVal / cols) * (100 / (rows - 1));
+                const isCorrect = tileVal === idx;
 
                 return (
                   <button
@@ -1152,8 +1153,19 @@ function PuzzlePage() {
                       backgroundPosition: `${posX}% ${posY}%`,
                       backgroundRepeat: 'no-repeat',
                     }}
-                    aria-label={`Slide tile`}
-                  />
+                    aria-label={`Slide tile ${tileVal + 1}`}
+                  >
+                    {/* Very small corner number so artwork remains clearly visible */}
+                    <span
+                      className={`absolute top-0.5 left-0.5 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-mono font-bold leading-none select-none pointer-events-none ${
+                        isCorrect
+                          ? 'bg-emerald-600/80 text-white shadow-xs'
+                          : 'bg-black/45 text-white/90 backdrop-blur-[1px]'
+                      }`}
+                    >
+                      {tileVal + 1}
+                    </span>
+                  </button>
                 );
               })}
             </div>
