@@ -19,6 +19,12 @@ import {
   checkUsernameConflictInMongo,
   updateScoreInMongo,
   deleteScoreInMongo,
+  getPuzzleConfigFromMongo,
+  savePuzzleConfigToMongo,
+  checkPuzzleAttemptInMongo,
+  savePuzzleScoreToMongo,
+  getPuzzleLeaderboardFromMongo,
+  getPuzzleStatsFromMongo,
 } from "./server/db-service";
 
 type ServerEntry = {
@@ -329,6 +335,113 @@ export default {
             headers: { 'content-type': 'application/json' },
           });
         }
+      }
+    }
+
+    // =========================================================================
+    // 🧩 NAVRATRI SLIDING PUZZLE API HANDLERS
+    // =========================================================================
+
+    // ⚙️ Puzzle Config (get & toggle)
+    if (url.pathname === '/api/puzzle/config') {
+      if (request.method === 'GET') {
+        try {
+          const cfg = await getPuzzleConfigFromMongo();
+          return new Response(JSON.stringify(cfg), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ enabled: true, bonusPoints: 50, topLimit: 10 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
+
+      if (request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const ok = await savePuzzleConfigToMongo(body);
+          return new Response(JSON.stringify({ success: ok }), {
+            status: ok ? 200 : 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ success: false, error: err?.message }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
+    }
+
+    // 🛡️ Check if user already attempted today's puzzle
+    if (url.pathname === '/api/puzzle/attempt' && request.method === 'GET') {
+      try {
+        const username = url.searchParams.get('username') || undefined;
+        const rollNo = url.searchParams.get('rollNo') || undefined;
+        const date = url.searchParams.get('date') || undefined;
+        const result = await checkPuzzleAttemptInMongo(username, rollNo, date);
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ attempted: false }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 🏆 Submit completed puzzle score (1 attempt per day, calculate top 10 bonus)
+    if (url.pathname === '/api/puzzle/submit' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const res = await savePuzzleScoreToMongo(body, clientIp);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 📊 Puzzle Leaderboard (fastest solvers, top 10 bonus highlighted)
+    if (url.pathname === '/api/puzzle/leaderboard' && request.method === 'GET') {
+      try {
+        const date = url.searchParams.get('date') || undefined;
+        const scores = await getPuzzleLeaderboardFromMongo(date);
+        return new Response(JSON.stringify(scores), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify([]), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 📈 Puzzle Stats for Admin Dashboard
+    if (url.pathname === '/api/puzzle/stats' && request.method === 'GET') {
+      try {
+        const stats = await getPuzzleStatsFromMongo();
+        return new Response(JSON.stringify(stats), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ totalAttemptsToday: 0, fastestTimeSeconds: null, top10BonusAwardedCount: 0, enabled: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
       }
     }
 

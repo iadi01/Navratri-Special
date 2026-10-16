@@ -825,3 +825,412 @@ export async function deleteScoreInMongo(params: {
     return { success: false, error: err?.message || 'Failed to delete record.' };
   }
 }
+
+// =========================================================================
+// 🧩 NAVRATRI SLIDING PUZZLE BACKEND SERVICES
+// =========================================================================
+
+export type PuzzleLevelScore = {
+  level: number;
+  name: string;
+  timeSeconds: number;
+  moves: number;
+};
+
+export type PuzzleSubmission = {
+  id?: string;
+  username: string;
+  fullName?: string;
+  course?: string;
+  year?: string;
+  batch?: string;
+  rollNo?: string;
+  email?: string;
+  date?: string; // YYYY-MM-DD
+  completedLevels: number; // 1, 2, or 3
+  totalTimeSeconds: number;
+  totalMoves: number;
+  levelBreakdown?: PuzzleLevelScore[];
+  clientIp?: string;
+  submittedAt?: string;
+};
+
+export type PuzzleLeaderboardEntry = {
+  id: string;
+  username: string;
+  fullName: string;
+  course: string;
+  year: string;
+  batch: string;
+  rollNo: string;
+  date: string;
+  completedLevels: number;
+  totalTimeSeconds: number;
+  totalMoves: number;
+  rank: number;
+  isTop10: boolean;
+  bonusPoints: number;
+  submittedAt: string;
+  levelBreakdown?: PuzzleLevelScore[];
+};
+
+export type PuzzleConfig = {
+  enabled: boolean;
+  bonusPoints: number;
+  topLimit: number;
+  updatedAt?: string;
+};
+
+function getTodayIST(): string {
+  const d = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(d.getTime() + istOffset);
+  return istDate.toISOString().slice(0, 10);
+}
+
+export async function getPuzzleConfigFromMongo(): Promise<PuzzleConfig> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { enabled: true, bonusPoints: 50, topLimit: 10 };
+    }
+
+    const configCol = db.collection('config');
+    const doc = await configCol.findOne({ key: 'puzzle_config' });
+    if (doc) {
+      return {
+        enabled: doc.enabled !== false,
+        bonusPoints: Number(doc.bonusPoints || 50),
+        topLimit: Number(doc.topLimit || 10),
+        updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
+      };
+    }
+    return { enabled: true, bonusPoints: 50, topLimit: 10 };
+  } catch (err) {
+    return { enabled: true, bonusPoints: 50, topLimit: 10 };
+  }
+}
+
+export async function savePuzzleConfigToMongo(config: {
+  enabled: boolean;
+  bonusPoints?: number;
+  topLimit?: number;
+}): Promise<boolean> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return false;
+    }
+
+    const configCol = db.collection('config');
+    await configCol.updateOne(
+      { key: 'puzzle_config' },
+      {
+        $set: {
+          key: 'puzzle_config',
+          enabled: Boolean(config.enabled),
+          bonusPoints: Number(config.bonusPoints || 50),
+          topLimit: Number(config.topLimit || 10),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function checkPuzzleAttemptInMongo(
+  identifier?: string,
+  rollNo?: string,
+  dateStr?: string
+): Promise<{ attempted: boolean; existingScore?: any; reason?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { attempted: false };
+    }
+
+    const puzzleScoresCol = db.collection('puzzle_scores');
+    const targetDate = dateStr || getTodayIST();
+    const cleanId = (identifier || '').trim();
+    const cleanRoll = (rollNo || '').trim().toUpperCase();
+
+    const conditions: any[] = [];
+    if (cleanRoll) {
+      conditions.push({ rollNo: cleanRoll });
+    }
+    if (cleanId) {
+      const esc = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      conditions.push({ username: { $regex: new RegExp(`^${esc}$`, 'i') } });
+      conditions.push({ fullName: { $regex: new RegExp(`^${esc}$`, 'i') } });
+    }
+
+    if (conditions.length === 0) {
+      return { attempted: false };
+    }
+
+    const existing = await puzzleScoresCol.findOne({
+      date: targetDate,
+      $or: conditions,
+    });
+
+    if (existing) {
+      return {
+        attempted: true,
+        reason: `Participant "${existing.fullName || existing.username}" has already completed today's Navratri puzzle challenge.`,
+        existingScore: {
+          id: existing.id,
+          username: existing.username,
+          fullName: existing.fullName,
+          course: existing.course,
+          rollNo: existing.rollNo,
+          completedLevels: existing.completedLevels,
+          totalTimeSeconds: existing.totalTimeSeconds,
+          totalMoves: existing.totalMoves,
+          bonusAwarded: existing.bonusAwarded,
+          bonusPoints: existing.bonusPoints,
+          submittedAt: existing.submittedAt,
+          rank: existing.rank,
+        },
+      };
+    }
+
+    return { attempted: false };
+  } catch (err: any) {
+    console.error('Error checking puzzle attempt in Mongo:', err?.message);
+    return { attempted: false };
+  }
+}
+
+export async function savePuzzleScoreToMongo(
+  submission: PuzzleSubmission,
+  clientIp?: string
+): Promise<{
+  success: boolean;
+  error?: string;
+  isTop10?: boolean;
+  rank?: number;
+  bonusPoints?: number;
+}> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { success: false, error: 'Database not connected.' };
+    }
+
+    // 1. Verify game is enabled
+    const config = await getPuzzleConfigFromMongo();
+    if (!config.enabled) {
+      return {
+        success: false,
+        error: 'The Navratri Sliding Puzzle is currently disabled by Admin.',
+      };
+    }
+
+    const puzzleScoresCol = db.collection('puzzle_scores');
+    const targetDate = submission.date || getTodayIST();
+    const cleanRollNo = (submission.rollNo || '').trim().toUpperCase();
+    const cleanUsername = (submission.username || '').trim();
+    const cleanFullName = (submission.fullName || submission.username || '').trim();
+    const cleanCourse = (submission.course || '').trim();
+    const cleanYear = (submission.year || '').trim();
+    const cleanBatch = (submission.batch || '').trim();
+    const cleanEmail = (submission.email || '').trim();
+
+    // 2. Anti-cheat check: strictly 1 attempt per day per student
+    const checkAttempt = await checkPuzzleAttemptInMongo(cleanUsername, cleanRollNo, targetDate);
+    if (checkAttempt.attempted) {
+      return {
+        success: false,
+        error: checkAttempt.reason || 'You have already submitted your puzzle attempt for today. Only 1 attempt per day is allowed!',
+      };
+    }
+
+    // 3. Calculate rank for today's submissions
+    const todayEntries = await puzzleScoresCol
+      .find({ date: targetDate })
+      .sort({ completedLevels: -1, totalTimeSeconds: 1, totalMoves: 1, createdAt: 1 })
+      .toArray();
+
+    const currentLevels = Number(submission.completedLevels);
+    const currentTime = Number(submission.totalTimeSeconds);
+    const currentMoves = Number(submission.totalMoves);
+
+    let rank = 1;
+    for (const e of todayEntries) {
+      const eLevels = Number(e.completedLevels || 0);
+      const eTime = Number(e.totalTimeSeconds || 0);
+      const eMoves = Number(e.totalMoves || 0);
+
+      if (
+        eLevels > currentLevels ||
+        (eLevels === currentLevels && eTime < currentTime) ||
+        (eLevels === currentLevels && eTime === currentTime && eMoves <= currentMoves)
+      ) {
+        rank++;
+      }
+    }
+
+    const isTop10 = rank <= (config.topLimit || 10);
+    const bonusPoints = isTop10 ? (config.bonusPoints || 50) : 0;
+    const entryId = submission.id || `puzzle-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date();
+
+    // 4. Save puzzle score
+    await puzzleScoresCol.insertOne({
+      id: entryId,
+      username: cleanUsername,
+      fullName: cleanFullName,
+      course: cleanCourse,
+      year: cleanYear,
+      batch: cleanBatch,
+      rollNo: cleanRollNo,
+      email: cleanEmail,
+      date: targetDate,
+      completedLevels: currentLevels,
+      totalTimeSeconds: currentTime,
+      totalMoves: currentMoves,
+      levelBreakdown: submission.levelBreakdown || [],
+      bonusAwarded: isTop10,
+      bonusPoints,
+      rank,
+      clientIp: clientIp || submission.clientIp || '',
+      submittedAt: submission.submittedAt || now.toISOString(),
+      createdAt: now,
+    });
+
+    // 5. Update users collection profile
+    const usersCol = db.collection('users');
+    await usersCol.updateOne(
+      { username: cleanUsername.toLowerCase() },
+      {
+        $set: {
+          username: cleanUsername,
+          fullName: cleanFullName,
+          course: cleanCourse,
+          year: cleanYear,
+          batch: cleanBatch,
+          rollNo: cleanRollNo,
+          email: cleanEmail,
+          lastIp: clientIp || '',
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          createdAt: now,
+          editCount: 0,
+        },
+      },
+      { upsert: true }
+    );
+
+    return {
+      success: true,
+      isTop10,
+      rank,
+      bonusPoints,
+    };
+  } catch (err: any) {
+    console.error('Failed to save puzzle score to Mongo:', err?.message);
+    return { success: false, error: err?.message || 'Failed to record puzzle score.' };
+  }
+}
+
+export async function getPuzzleLeaderboardFromMongo(
+  dateStr?: string
+): Promise<PuzzleLeaderboardEntry[]> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return [];
+    }
+
+    const puzzleScoresCol = db.collection('puzzle_scores');
+    const targetDate = dateStr || getTodayIST();
+
+    const entries = await puzzleScoresCol
+      .find({ date: targetDate })
+      .sort({ completedLevels: -1, totalTimeSeconds: 1, totalMoves: 1, createdAt: 1 })
+      .toArray();
+
+    return entries.map((e, index) => {
+      const rank = index + 1;
+      const isTop10 = rank <= 10;
+      return {
+        id: e.id || e._id?.toString(),
+        username: e.username || '',
+        fullName: e.fullName || e.username || '',
+        course: e.course || '',
+        year: e.year || '',
+        batch: e.batch || '',
+        rollNo: e.rollNo || '',
+        date: e.date || targetDate,
+        completedLevels: Number(e.completedLevels || 1),
+        totalTimeSeconds: Number(e.totalTimeSeconds || 0),
+        totalMoves: Number(e.totalMoves || 0),
+        rank,
+        isTop10,
+        bonusPoints: isTop10 ? 50 : 0,
+        submittedAt: e.submittedAt || '',
+        levelBreakdown: e.levelBreakdown || [],
+      };
+    });
+  } catch (err) {
+    console.error('Error fetching puzzle leaderboard from Mongo:', err);
+    return [];
+  }
+}
+
+export async function getPuzzleStatsFromMongo(): Promise<{
+  totalAttemptsToday: number;
+  fastestTimeSeconds: number | null;
+  top10BonusAwardedCount: number;
+  enabled: boolean;
+}> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return {
+        totalAttemptsToday: 0,
+        fastestTimeSeconds: null,
+        top10BonusAwardedCount: 0,
+        enabled: true,
+      };
+    }
+
+    const config = await getPuzzleConfigFromMongo();
+    const puzzleScoresCol = db.collection('puzzle_scores');
+    const today = getTodayIST();
+
+    const todayAttempts = await puzzleScoresCol.find({ date: today }).toArray();
+    const totalAttemptsToday = todayAttempts.length;
+
+    let fastestTimeSeconds: number | null = null;
+    let top10BonusAwardedCount = 0;
+
+    for (const a of todayAttempts) {
+      if (a.bonusAwarded) top10BonusAwardedCount++;
+      const time = Number(a.totalTimeSeconds || 0);
+      if (time > 0 && (fastestTimeSeconds === null || time < fastestTimeSeconds)) {
+        fastestTimeSeconds = time;
+      }
+    }
+
+    return {
+      totalAttemptsToday,
+      fastestTimeSeconds,
+      top10BonusAwardedCount,
+      enabled: config.enabled,
+    };
+  } catch (err) {
+    return {
+      totalAttemptsToday: 0,
+      fastestTimeSeconds: null,
+      top10BonusAwardedCount: 0,
+      enabled: true,
+    };
+  }
+}
+

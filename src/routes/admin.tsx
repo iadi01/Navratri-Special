@@ -119,14 +119,43 @@ function AdminPage() {
   const [adminActionMsg, setAdminActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
 
+  // Navratri Sliding Puzzle Game Admin State
+  const [puzzleEnabled, setPuzzleEnabled] = useState<boolean>(true);
+  const [puzzleStats, setPuzzleStats] = useState<{
+    totalAttemptsToday: number;
+    fastestTimeSeconds: number | null;
+    top10BonusAwardedCount: number;
+  }>({
+    totalAttemptsToday: 0,
+    fastestTimeSeconds: null,
+    top10BonusAwardedCount: 0,
+  });
+  const [isTogglingPuzzle, setIsTogglingPuzzle] = useState<boolean>(false);
+
+  const fetchPuzzleAdminData = async () => {
+    try {
+      const cfgRes = await fetch('/api/puzzle/config');
+      if (cfgRes.ok) {
+        const cfg = await cfgRes.json();
+        setPuzzleEnabled(cfg.enabled !== false);
+      }
+      const statsRes = await fetch('/api/puzzle/stats');
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        setPuzzleStats(stats);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     const s = getAdminSession();
     setSession(s);
     setLiveDays(getLiveDays());
     setParticipants(getOverallLeaderboard());
 
-    // Fetch live days from server
+    // Fetch live days & puzzle status from server
     syncLiveDaysWithServer().then(days => setLiveDays(days));
+    fetchPuzzleAdminData();
 
     if (s.isAuthenticated) {
       setAdminList(getAllAdmins());
@@ -178,6 +207,26 @@ function AdminPage() {
   const handleToggleDay = async (day: number) => {
     const updated = await toggleDayLive(day);
     setLiveDays(updated);
+  };
+
+  const handleTogglePuzzle = async () => {
+    setIsTogglingPuzzle(true);
+    try {
+      const nextState = !puzzleEnabled;
+      const res = await fetch('/api/puzzle/config', {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ enabled: nextState }),
+      });
+      if (res.ok) {
+        setPuzzleEnabled(nextState);
+        fetchPuzzleAdminData();
+      }
+    } catch {
+      alert('Failed to toggle puzzle game status.');
+    } finally {
+      setIsTogglingPuzzle(false);
+    }
   };
 
   const handleAddAdmin = async (e: React.FormEvent) => {
@@ -496,6 +545,84 @@ function AdminPage() {
       {/* TAB 1: LIVE BROADCAST CONTROLLER (Available to all admins) */}
       {activeTab === 'live' && (
         <div className="space-y-6">
+          {/* 🌸 NAVRATRI SLIDING PUZZLE BROADCAST CONTROLLER */}
+          <div className="bg-card border-2 border-pink-500/30 rounded-xl p-5 md:p-6 shadow-sm bg-gradient-to-r from-pink-50/40 via-card to-card">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🧩</span>
+                  <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                    Navratri Sliding Puzzle Game Controller
+                  </h2>
+                  {puzzleEnabled ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> ACTIVE NOW
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                      <Lock size={11} /> DISABLED
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Control the special Navratri sliding puzzle game globally. When enabled, users can play Easy, Medium & Hard levels to win +50 bonus points.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Button
+                  size="sm"
+                  variant={puzzleEnabled ? 'outline' : 'default'}
+                  onClick={handleTogglePuzzle}
+                  disabled={isTogglingPuzzle}
+                  className={`font-bold text-xs ${
+                    puzzleEnabled
+                      ? 'border-destructive text-destructive hover:bg-destructive/10'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {puzzleEnabled ? (
+                    <>
+                      <Lock size={13} className="mr-1.5" /> Turn Puzzle OFF
+                    </>
+                  ) : (
+                    <>
+                      <Unlock size={13} className="mr-1.5" /> Turn Puzzle ON
+                    </>
+                  )}
+                </Button>
+
+                <Button size="sm" variant="ghost" className="text-xs" asChild>
+                  <Link to="/puzzle">
+                    Open Puzzle Page <ArrowRight size={12} className="ml-1" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            {/* Puzzle Fast Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-border/60">
+              <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
+                <span className="text-xs text-muted-foreground block">Today's Solvers</span>
+                <span className="text-base font-bold text-foreground">
+                  {puzzleStats.totalAttemptsToday} student(s)
+                </span>
+              </div>
+              <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
+                <span className="text-xs text-muted-foreground block">Fastest Completion</span>
+                <span className="text-base font-bold text-foreground font-mono">
+                  {puzzleStats.fastestTimeSeconds !== null ? `${puzzleStats.fastestTimeSeconds}s` : 'None yet'}
+                </span>
+              </div>
+              <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50 col-span-2 sm:col-span-1">
+                <span className="text-xs text-muted-foreground block">Top 10 Bonus Awardees</span>
+                <span className="text-base font-bold text-pink-600">
+                  {puzzleStats.top10BonusAwardedCount} rewarded (+50 pts)
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-card border border-border rounded-xl p-5 md:p-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
               <div>
