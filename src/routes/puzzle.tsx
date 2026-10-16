@@ -317,6 +317,31 @@ function PuzzlePage() {
               localStorage.setItem(SUBMITTED_CACHE_KEY, todayIST);
               setHasAttemptedToday(true);
             }
+          } else {
+            // 🌟 Server verified: User has NOT attempted in MongoDB (or admin deleted score from database)
+            // Immediately clean up local submission cache so user can play freshly!
+            try {
+              localStorage.removeItem(SUBMITTED_CACHE_KEY);
+              const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+              if (savedRaw) {
+                const parsed = JSON.parse(savedRaw);
+                if (parsed && (parsed.submitted || parsed.date !== todayIST)) {
+                  parsed.submitted = false;
+                  parsed.level = 0;
+                  parsed.moves = 0;
+                  parsed.accumulatedSeconds = 0;
+                  parsed.done = [false, false, false];
+                  parsed.levelTimeSeconds = [0, 0, 0];
+                  parsed.levelMoves = [0, 0, 0];
+                  const n = LEVELS[0].cols * LEVELS[0].rows;
+                  parsed.tiles = [...Array(n).keys()];
+                  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsed));
+                }
+              }
+            } catch {}
+
+            setHasAttemptedToday(false);
+            setServerExistingScore(null);
           }
         }
       } catch (err) {
@@ -858,7 +883,7 @@ function PuzzlePage() {
       )}
 
       {/* 🏆 COMPLETED TODAY BANNER (Anti-Cheat 1-Attempt Record) */}
-      {!isLoadingConfig && isEnabled && hasAttemptedToday && (
+      {!isLoadingConfig && isEnabled && hasAttemptedToday && Boolean(serverExistingScore) && (
         <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-6 sm:p-8 shadow-[6px_6px_0px_#1C332E] text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-pink-100 border-3 border-[#1C332E] flex items-center justify-center text-pink-700 shadow-[3px_3px_0px_#1C332E]">
             <Trophy size={32} className="animate-bounce" />
@@ -944,7 +969,7 @@ function PuzzlePage() {
       )}
 
       {/* 🧩 MAIN PUZZLE INTERACTION CARD (Active Game) */}
-      {!isLoadingConfig && isEnabled && !hasAttemptedToday && (
+      {!isLoadingConfig && isEnabled && (!hasAttemptedToday || !serverExistingScore) && (
         <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-4 sm:p-7 shadow-[6px_6px_0px_#1C332E] space-y-5">
           {/* Level Progress Indicator (Non-clickable: Once advanced, previous levels cannot be replayed) */}
           <div className="flex flex-wrap items-center justify-center gap-2">
