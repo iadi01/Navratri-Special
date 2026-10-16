@@ -17,9 +17,6 @@ import {
   Shuffle,
   Star,
   Users,
-  Crown,
-  Eye,
-  EyeOff,
   Sparkles,
   Share2
 } from 'lucide-react';
@@ -30,7 +27,6 @@ import {
   saveUserProfile,
   type UserProfile
 } from '@/lib/leaderboard-store';
-import { getAdminSession } from '@/lib/admin-store';
 import { PuzzleShareModal } from '@/components/puzzle-share-modal';
 
 export const Route = createFileRoute('/puzzle')({
@@ -61,7 +57,7 @@ const LEVELS = [
     cols: 3,
     rows: 3,
     art: '🪔',
-    desc: 'Level 1: 3×3 Grid · Maa Durga ki jyoti — light the way!',
+    desc: 'Level 1: 3×3 Grid · Pastel Durga Under the Temple Arch',
     image: '/navratri-puzzle-art-0.jpg',
     aspectRatio: 1, // 3 / 3
   },
@@ -71,7 +67,7 @@ const LEVELS = [
     cols: 4,
     rows: 3,
     art: '🌺',
-    desc: 'Level 2: 4×3 Grid · Divine Navratri celebration.',
+    desc: 'Level 2: 4×3 Grid · Devotional Temple Shrine with Children',
     image: '/navratri-puzzle-art-1.jpg',
     aspectRatio: 4 / 3, // 1.333
   },
@@ -81,7 +77,7 @@ const LEVELS = [
     cols: 6,
     rows: 3,
     art: '💃',
-    desc: 'Level 3: 6×3 Grid · Dandiya night celebration!',
+    desc: 'Level 3: 6×3 Grid · Amity University Garba Celebration',
     image: '/navratri-puzzle-art-2.jpg',
     aspectRatio: 6 / 3, // 2.0
   },
@@ -236,12 +232,6 @@ function PuzzlePage() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
 
-  // Main Admin Exclusive Detection (Chief Curator)
-  const [isMainAdmin] = useState<boolean>(() => {
-    const s = getAdminSession();
-    return s.isAuthenticated && s.user?.role === 'main_admin';
-  });
-  const [adminShowTargetArtwork, setAdminShowTargetArtwork] = useState<boolean>(false);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
 
   // Timer reference
@@ -658,56 +648,6 @@ function PuzzlePage() {
     }
   };
 
-  // Main Admin Exclusive Control Actions
-  const handleAdminJumpLevel = (targetIdx: number) => {
-    if (!isMainAdmin) return;
-    if (targetIdx < 0 || targetIdx >= LEVELS.length) return;
-
-    setCurrentLevelIdx(targetIdx);
-    const targetCols = LEVELS[targetIdx].cols;
-    const targetRows = LEVELS[targetIdx].rows;
-    const nextTiles = generateSolvableTiles(targetCols, targetRows);
-
-    setTiles(nextTiles);
-    setMoves(0);
-    setSessionElapsed(0);
-    sessionStartTsRef.current = Date.now();
-    setIsGameActive(true);
-
-    saveStateToStorage({
-      level: targetIdx,
-      tiles: nextTiles,
-      moves: 0,
-      unlocked: Math.max(unlockedLevel, targetIdx),
-    });
-  };
-
-  const handleAdminInstantSolve = () => {
-    if (!isMainAdmin) return;
-    const n = currentLevel.cols * currentLevel.rows;
-    const solved = [...Array(n).keys()];
-    setTiles(solved);
-    handleLevelComplete(solved, moves);
-  };
-
-  const handleAdminResetAttempt = () => {
-    if (!isMainAdmin) return;
-    try {
-      localStorage.removeItem(SUBMITTED_CACHE_KEY);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    } catch {}
-    setHasAttemptedToday(false);
-    setServerExistingScore(null);
-    setCurrentLevelIdx(0);
-    setDoneLevels([false, false, false]);
-    setUnlockedLevel(0);
-    setMoves(0);
-    setAccumulatedSeconds(0);
-    setSessionElapsed(0);
-    const initialTiles = generateSolvableTiles(LEVELS[0].cols, LEVELS[0].rows);
-    setTiles(initialTiles);
-    setIsGameActive(true);
-  };
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 max-w-4xl mx-auto space-y-6">
@@ -753,82 +693,6 @@ function PuzzlePage() {
         </div>
       )}
 
-      {/* 👑 MAIN ADMIN EXCLUSIVE CONTROLS BAR (Hidden from Students & Sub-Admins) */}
-      {isMainAdmin && (
-        <div className="bg-gradient-to-r from-amber-500/15 via-pink-500/10 to-purple-500/15 border-2 border-amber-500/40 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/30">
-                <Crown size={20} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-sm sm:text-base text-foreground font-['Baloo_2']">
-                    Chief Curator — Main Admin Puzzle Inspector
-                  </h3>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40">
-                    MAIN ADMIN ONLY
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  You have exclusive access to view full target solution artworks and jump across levels freely.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant={adminShowTargetArtwork ? 'default' : 'outline'}
-                onClick={() => setAdminShowTargetArtwork(!adminShowTargetArtwork)}
-                className={`text-xs font-bold border-2 ${
-                  adminShowTargetArtwork
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-700'
-                    : 'border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10'
-                }`}
-              >
-                <Eye size={13} className="mr-1.5" />
-                {adminShowTargetArtwork ? 'Hide Target Artwork' : '👁️ View Full Target Artwork'}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleAdminInstantSolve}
-                disabled={doneLevels[currentLevelIdx]}
-                className="text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-pink-50 text-pink-700"
-              >
-                <Sparkles size={13} className="mr-1.5" />
-                Instant Solve Level
-              </Button>
-            </div>
-          </div>
-
-          {/* Level Switcher for Main Admin */}
-          <div className="pt-2.5 border-t border-amber-500/20 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
-              ⚡ Jump to Level (Admin Bypass):
-            </span>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {LEVELS.map((lv, idx) => (
-                <Button
-                  key={lv.name}
-                  size="sm"
-                  variant={currentLevelIdx === idx ? 'default' : 'outline'}
-                  onClick={() => handleAdminJumpLevel(idx)}
-                  className={`h-7 text-xs font-bold ${
-                    currentLevelIdx === idx
-                      ? 'bg-[#1C332E] text-white'
-                      : 'border-border/80 hover:bg-muted text-foreground'
-                  }`}
-                >
-                  {lv.art} {lv.name} ({lv.cols}×{lv.rows})
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 👤 PLAYER IDENTITY BAR */}
       {!isLoadingConfig && isEnabled && (
@@ -942,17 +806,6 @@ function PuzzlePage() {
             </Button>
           </div>
 
-          {isMainAdmin && (
-            <div className="pt-3 border-t border-amber-500/30 flex justify-center">
-              <Button
-                size="sm"
-                onClick={handleAdminResetAttempt}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-bold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E]"
-              >
-                <Crown size={14} className="mr-1.5" /> Main Admin: Test Play Again (Bypass 1-Attempt Lock)
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
@@ -1028,35 +881,6 @@ function PuzzlePage() {
             </div>
           </div>
 
-          {/* 🎯 MAIN ADMIN TARGET ARTWORK PREVIEW (Concealed from Students & Sub-Admins) */}
-          {isMainAdmin && adminShowTargetArtwork && (
-            <div className="bg-amber-50/80 dark:bg-amber-950/20 border-2 border-amber-500/40 rounded-2xl p-3.5 sm:p-4 space-y-2 animate-in fade-in-50 duration-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Crown size={15} className="text-amber-500" />
-                  <span className="font-extrabold text-xs sm:text-sm text-foreground">
-                    Target Solution Artwork: Level {currentLevelIdx + 1} ({currentLevel.name} · {currentLevel.cols}×{currentLevel.rows})
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-                  Visible to Main Admin Only
-                </span>
-              </div>
-              <div
-                className="relative mx-auto max-w-xs sm:max-w-sm rounded-xl overflow-hidden border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] bg-black/5"
-                style={{ aspectRatio: currentLevel.aspectRatio }}
-              >
-                <img
-                  src={currentLevel.image}
-                  alt={currentLevel.name}
-                  className="w-full h-full object-cover select-none"
-                />
-              </div>
-              <p className="text-center text-[11px] text-muted-foreground font-medium">
-                {currentLevel.desc}
-              </p>
-            </div>
-          )}
 
           {/* Sliding Puzzle Grid */}
           <div className="w-full max-w-[540px] mx-auto relative">

@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   Check,
   Sparkles,
+  Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ import {
   syncLeaderboardWithServer,
   type OverallLeaderboardEntry,
 } from '@/lib/leaderboard-store';
+import { PuzzleShareModal } from '@/components/puzzle-share-modal';
 
 export const Route = createFileRoute('/admin')({
   head: () => ({
@@ -74,7 +76,7 @@ const ADMIN_PUZZLE_LEVELS = [
     rows: 3,
     totalTiles: 9,
     art: '🪔',
-    desc: 'Level 1: 3×3 Grid · Maa Durga ki jyoti — light the way!',
+    desc: 'Level 1: 3×3 Grid · Pastel Durga Under the Temple Arch',
     image: '/navratri-puzzle-art-0.jpg',
     aspectRatio: '1 / 1',
   },
@@ -85,7 +87,7 @@ const ADMIN_PUZZLE_LEVELS = [
     rows: 3,
     totalTiles: 12,
     art: '🌺',
-    desc: 'Level 2: 4×3 Grid · Divine Navratri celebration.',
+    desc: 'Level 2: 4×3 Grid · Devotional Temple Shrine with Children',
     image: '/navratri-puzzle-art-1.jpg',
     aspectRatio: '4 / 3',
   },
@@ -96,7 +98,7 @@ const ADMIN_PUZZLE_LEVELS = [
     rows: 3,
     totalTiles: 18,
     art: '💃',
-    desc: 'Level 3: 6×3 Grid · Dandiya night celebration!',
+    desc: 'Level 3: 6×3 Grid · Amity University Garba Celebration',
     image: '/navratri-puzzle-art-2.jpg',
     aspectRatio: '6 / 3',
   },
@@ -172,6 +174,8 @@ function AdminPage() {
   const [isLoadingPuzzleSubmissions, setIsLoadingPuzzleSubmissions] = useState<boolean>(false);
   const [showPuzzleInspector, setShowPuzzleInspector] = useState<boolean>(false);
   const [showGridOverlayOnArtwork, setShowGridOverlayOnArtwork] = useState<boolean>(false);
+  const [showAdminShareModal, setShowAdminShareModal] = useState<boolean>(false);
+  const [adminShareLevel, setAdminShareLevel] = useState<number>(3);
 
   const loadPuzzleSubmissions = async () => {
     setIsLoadingPuzzleSubmissions(true);
@@ -659,15 +663,28 @@ function AdminPage() {
                 </Button>
 
                 {isMainAdmin && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowPuzzleInspector(!showPuzzleInspector)}
-                    className="border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold text-xs"
-                  >
-                    <Crown size={13} className="mr-1.5 text-amber-500" />
-                    {showPuzzleInspector ? 'Hide Full Puzzle' : '👁️ View Full Puzzle (Main Admin Only)'}
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowPuzzleInspector(!showPuzzleInspector)}
+                      className="border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold text-xs"
+                    >
+                      <Crown size={13} className="mr-1.5 text-amber-500" />
+                      {showPuzzleInspector ? 'Hide Full Puzzle' : '👁️ View Full Puzzle (Main Admin Only)'}
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setAdminShareLevel(3);
+                        setShowAdminShareModal(true);
+                      }}
+                      className="bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs shadow-xs cursor-pointer"
+                    >
+                      <Share2 size={13} className="mr-1.5" /> Share to BeSocial (4:5 Card)
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -856,7 +873,7 @@ function AdminPage() {
                         {lv.desc}
                       </p>
 
-                      <div className="pt-2 mt-auto flex items-center justify-between gap-2 border-t border-border/50">
+                      <div className="pt-2 mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/50">
                         <a
                           href={lv.image}
                           target="_blank"
@@ -865,11 +882,23 @@ function AdminPage() {
                         >
                           <Eye size={12} /> Full Image ↗
                         </a>
-                        <Button size="sm" variant="outline" className="text-[11px] h-7 px-2.5 font-bold" asChild>
-                          <Link to="/puzzle">
-                            Test on /puzzle <ArrowRight size={11} className="ml-1" />
-                          </Link>
-                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setAdminShareLevel(lv.level + 1);
+                              setShowAdminShareModal(true);
+                            }}
+                            className="text-[11px] h-7 px-2 font-bold bg-pink-600 hover:bg-pink-700 text-white cursor-pointer"
+                          >
+                            <Share2 size={11} className="mr-1" /> Share Level {lv.level + 1}
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-[11px] h-7 px-2 font-bold" asChild>
+                            <Link to="/puzzle">
+                              Play <ArrowRight size={11} className="ml-0.5" />
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -2007,6 +2036,24 @@ function AdminPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 👑 MAIN ADMIN BE SOCIAL PUZZLE SHARE MODAL */}
+      {isMainAdmin && showAdminShareModal && (
+        <PuzzleShareModal
+          isOpen={showAdminShareModal}
+          onClose={() => setShowAdminShareModal(false)}
+          completedLevels={adminShareLevel}
+          totalTimeSeconds={adminShareLevel === 3 ? 42 : adminShareLevel === 2 ? 28 : 14}
+          totalMoves={adminShareLevel === 3 ? 24 : adminShareLevel === 2 ? 16 : 9}
+          pointsEarned={adminShareLevel === 3 ? 50 : adminShareLevel === 2 ? 30 : 15}
+          rank={1}
+          fullName={session.user?.name || session.user?.username || 'Main Admin'}
+          course="Amity Online"
+          year="Faculty / Admin"
+          rollNo="ADMIN"
+          levelImage={ADMIN_PUZZLE_LEVELS[adminShareLevel - 1]?.image}
+        />
       )}
     </main>
   );
