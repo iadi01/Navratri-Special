@@ -6,8 +6,6 @@ import {
   RotateCcw,
   Sparkles,
   ArrowRight,
-  Eye,
-  EyeOff,
   CheckCircle2,
   Lock,
   Flame,
@@ -185,7 +183,6 @@ function PuzzlePage() {
   const [levelTimes, setLevelTimes] = useState<number[]>([0, 0, 0]);
   const [levelMovesArr, setLevelMovesArr] = useState<number[]>([0, 0, 0]);
   const [doneLevels, setDoneLevels] = useState<boolean[]>([false, false, false]);
-  const [showNumbers, setShowNumbers] = useState<boolean>(false);
 
   // Modals & UI
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
@@ -458,6 +455,7 @@ function PuzzlePage() {
   const proceedToNextLevel = (nextLevelIdx: number) => {
     setShowLevelModal(false);
     if (nextLevelIdx >= LEVELS.length) return;
+    if (nextLevelIdx <= currentLevelIdx) return; // Strict: Can never go backwards to previous levels
 
     setCurrentLevelIdx(nextLevelIdx);
     const targetCols = LEVELS[nextLevelIdx].cols;
@@ -654,12 +652,12 @@ function PuzzlePage() {
 
       {/* 🏆 COMPLETED TODAY BANNER (Anti-Cheat 1-Attempt Record) */}
       {hasAttemptedToday && (
-        <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 border-3 border-[#1C332E] rounded-3xl p-6 sm:p-8 shadow-[6px_6px_0px_#1C332E] text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 border-3 border-[#1C332E] flex items-center justify-center text-emerald-700 shadow-[3px_3px_0px_#1C332E]">
+        <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-6 sm:p-8 shadow-[6px_6px_0px_#1C332E] text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-pink-100 border-3 border-[#1C332E] flex items-center justify-center text-pink-700 shadow-[3px_3px_0px_#1C332E]">
             <Trophy size={32} className="animate-bounce" />
           </div>
           <div>
-            <span className="inline-block text-xs font-bold uppercase tracking-wider px-3 py-1 bg-emerald-200/80 text-emerald-900 rounded-full border border-emerald-400 mb-2">
+            <span className="inline-block text-xs font-bold uppercase tracking-wider px-3 py-1 bg-pink-100 text-pink-800 rounded-full border border-pink-300 mb-2">
               Challenge Completed Today
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground font-['Baloo_2']">
@@ -714,36 +712,28 @@ function PuzzlePage() {
       {/* 🧩 MAIN PUZZLE INTERACTION CARD (Active Game) */}
       {!hasAttemptedToday && isEnabled && (
         <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-4 sm:p-7 shadow-[6px_6px_0px_#1C332E] space-y-5">
-          {/* Level Switcher Tabs */}
+          {/* Level Progress Indicator (Non-clickable: Once advanced, previous levels cannot be replayed) */}
           <div className="flex flex-wrap items-center justify-center gap-2">
             {LEVELS.map((lv, idx) => {
               const isCurrent = idx === currentLevelIdx;
-              const isUnlocked = idx <= unlockedLevel;
               const isDone = doneLevels[idx];
+              const isLocked = idx > currentLevelIdx;
 
               return (
-                <button
+                <div
                   key={lv.name}
-                  onClick={() => {
-                    if (isUnlocked && idx !== currentLevelIdx) {
-                      proceedToNextLevel(idx);
-                    }
-                  }}
-                  disabled={!isUnlocked}
-                  className={`px-4 py-2 rounded-xl font-bold font-['Baloo_2'] text-sm sm:text-base border-2.5 border-[#1C332E] transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 rounded-xl font-bold font-['Baloo_2'] text-sm sm:text-base border-2.5 border-[#1C332E] flex items-center gap-1.5 select-none transition-all ${
                     isCurrent
-                      ? 'bg-pink-600 text-white shadow-[3px_3px_0px_#1C332E] scale-105'
+                      ? 'bg-pink-600 text-white shadow-[3px_3px_0px_#1C332E]'
                       : isDone
-                      ? 'bg-[#E1F0E9] text-[#1C332E] hover:bg-emerald-100'
-                      : isUnlocked
-                      ? 'bg-[#FBF0C8] text-[#1C332E] hover:bg-amber-100'
-                      : 'bg-muted/50 text-muted-foreground opacity-50 cursor-not-allowed'
+                      ? 'bg-white text-muted-foreground border-border/80'
+                      : 'bg-muted/30 text-muted-foreground/60 border-dashed border-border'
                   }`}
                 >
                   <span>{lv.art}</span>
-                  <span>{isDone ? `✓ ${lv.name}` : lv.name}</span>
-                  {!isUnlocked && <Lock size={12} className="ml-0.5" />}
-                </button>
+                  <span>{isDone ? `✓ ${lv.name} (Done)` : isCurrent ? `${lv.name} (Playing)` : lv.name}</span>
+                  {isLocked && <Lock size={12} className="ml-0.5 text-muted-foreground/60" />}
+                </div>
               );
             })}
           </div>
@@ -760,27 +750,15 @@ function PuzzlePage() {
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowNumbers(!showNumbers)}
-                className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white"
-              >
-                {showNumbers ? <EyeOff size={13} className="mr-1" /> : <Eye size={13} className="mr-1" />}
-                {showNumbers ? 'Hide Numbers' : 'Show Numbers'}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReshuffle}
-                disabled={doneLevels[currentLevelIdx]}
-                className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-amber-50"
-              >
-                <Shuffle size={13} className="mr-1" /> Reshuffle
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReshuffle}
+              disabled={doneLevels[currentLevelIdx]}
+              className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-amber-50"
+            >
+              <Shuffle size={13} className="mr-1" /> Reshuffle
+            </Button>
           </div>
 
           {/* Sliding Puzzle Grid */}
@@ -824,42 +802,10 @@ function PuzzlePage() {
                       backgroundPosition: `${posX}% ${posY}%`,
                       backgroundRepeat: 'no-repeat',
                     }}
-                    aria-label={`Move tile ${tileVal + 1}`}
-                  >
-                    {/* Optional Number Pill on Tile */}
-                    {showNumbers && (
-                      <span className="absolute top-1 left-1 bg-black/60 text-white font-extrabold text-[10px] sm:text-xs px-1.5 py-0.5 rounded backdrop-blur-sm border border-white/30">
-                        {tileVal + 1}
-                      </span>
-                    )}
-                  </button>
+                    aria-label={`Move tile`}
+                  />
                 );
               })}
-            </div>
-          </div>
-
-          {/* Level Info & Target Artwork Preview */}
-          <div className="bg-[#FCEBEF] border-2 border-dashed border-pink-400 rounded-2xl p-3.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{currentLevel.art}</span>
-              <div>
-                <h3 className="font-bold text-sm sm:text-base text-foreground font-['Baloo_2']">
-                  {currentLevel.desc}
-                </h3>
-                <p className="text-xs text-pink-900/80 font-medium">
-                  Click adjacent tiles to slide them into the blank space.
-                </p>
-              </div>
-            </div>
-
-            {/* Target Thumbnail */}
-            <div className="shrink-0 flex flex-col items-center gap-1">
-              <img
-                src={currentLevel.image}
-                alt="Target artwork"
-                className="w-14 sm:w-16 h-10 sm:h-12 object-cover rounded-lg border-2 border-[#1C332E] shadow-sm"
-              />
-              <span className="text-[10px] font-bold text-pink-700">Target</span>
             </div>
           </div>
 
@@ -990,7 +936,7 @@ function PuzzlePage() {
                       </td>
 
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs">
+                        <span className="px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200 font-bold text-xs">
                           {entry.completedLevels}/3
                         </span>
                       </td>
