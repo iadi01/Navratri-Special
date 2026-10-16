@@ -18,7 +18,11 @@ import {
   Star,
   Users,
   Sparkles,
-  Share2
+  Share2,
+  Lightbulb,
+  Eye,
+  Hash,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,31 +140,221 @@ function isSolved(tiles: number[]): boolean {
   return tiles.every((v, i) => v === i);
 }
 
-function isSolvable(tiles: number[], cols: number, rows: number): boolean {
-  const arr = tiles.filter(v => v !== tiles.length - 1);
-  let inv = 0;
-  for (let i = 0; i < arr.length; i++) {
-    for (let j = i + 1; j < arr.length; j++) {
-      if (arr[i] > arr[j]) inv++;
-    }
-  }
-  if (cols % 2 === 1) {
-    return inv % 2 === 0;
-  }
-  const emptyRowFromBottom = rows - Math.floor(tiles.indexOf(tiles.length - 1) / cols);
-  return (emptyRowFromBottom % 2 === 0) !== (inv % 2 === 0);
+function getNeighbors(emptyIdx: number, cols: number, rows: number): number[] {
+  const neighbors: number[] = [];
+  const emptyR = Math.floor(emptyIdx / cols);
+  const emptyC = emptyIdx % cols;
+  if (emptyR > 0) neighbors.push(emptyIdx - cols); // from top
+  if (emptyR < rows - 1) neighbors.push(emptyIdx + cols); // from bottom
+  if (emptyC > 0) neighbors.push(emptyIdx - 1); // from left
+  if (emptyC < cols - 1) neighbors.push(emptyIdx + 1); // from right
+  return neighbors;
 }
 
-function generateSolvableTiles(cols: number, rows: number): number[] {
-  const n = cols * rows;
-  const tiles = [...Array(n).keys()];
-  do {
-    for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+function manhattan(tiles: number[], cols: number, rows: number): number {
+  let dist = 0;
+  for (let i = 0; i < tiles.length; i++) {
+    const val = tiles[i];
+    if (val === tiles.length - 1) continue; // blank tile ignored
+    const targetR = Math.floor(val / cols);
+    const targetC = val % cols;
+    const currentR = Math.floor(i / cols);
+    const currentC = i % cols;
+    dist += Math.abs(targetR - currentR) + Math.abs(targetC - currentC);
+  }
+  return dist;
+}
+
+function linearConflicts(tiles: number[], cols: number, rows: number): number {
+  let conflict = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c1 = 0; c1 < cols; c1++) {
+      const idx1 = r * cols + c1;
+      const v1 = tiles[idx1];
+      if (v1 === tiles.length - 1 || Math.floor(v1 / cols) !== r) continue;
+      for (let c2 = c1 + 1; c2 < cols; c2++) {
+        const idx2 = r * cols + c2;
+        const v2 = tiles[idx2];
+        if (v2 === tiles.length - 1 || Math.floor(v2 / cols) !== r) continue;
+        if (v1 > v2) conflict += 2;
+      }
     }
-  } while (isSolved(tiles) || !isSolvable(tiles, cols, rows));
+  }
+  for (let c = 0; c < cols; c++) {
+    for (let r1 = 0; r1 < rows; r1++) {
+      const idx1 = r1 * cols + c;
+      const v1 = tiles[idx1];
+      if (v1 === tiles.length - 1 || (v1 % cols) !== c) continue;
+      for (let r2 = r1 + 1; r2 < rows; r2++) {
+        const idx2 = r2 * cols + c;
+        const v2 = tiles[idx2];
+        if (v2 === tiles.length - 1 || (v2 % cols) !== c) continue;
+        if (v1 > v2) conflict += 2;
+      }
+    }
+  }
+  return conflict;
+}
+
+function heuristic(tiles: number[], cols: number, rows: number): number {
+  return manhattan(tiles, cols, rows) + linearConflicts(tiles, cols, rows);
+}
+
+// Priority Queue for fast A* Hint Solver
+class MinHeap {
+  data: { tiles: number[]; emptyIdx: number; firstMove: number | null; g: number; f: number }[];
+  constructor() {
+    this.data = [];
+  }
+  push(val: { tiles: number[]; emptyIdx: number; firstMove: number | null; g: number; f: number }) {
+    this.data.push(val);
+    this._up(this.data.length - 1);
+  }
+  pop() {
+    if (this.data.length === 0) return null;
+    const top = this.data[0];
+    const bottom = this.data.pop()!;
+    if (this.data.length > 0) {
+      this.data[0] = bottom;
+      this._down(0);
+    }
+    return top;
+  }
+  size(): number {
+    return this.data.length;
+  }
+  private _up(idx: number) {
+    while (idx > 0) {
+      const p = (idx - 1) >> 1;
+      if (this.data[idx].f < this.data[p].f) {
+        [this.data[idx], this.data[p]] = [this.data[p], this.data[idx]];
+        idx = p;
+      } else break;
+    }
+  }
+  private _down(idx: number) {
+    const len = this.data.length;
+    while ((idx << 1) + 1 < len) {
+      const left = (idx << 1) + 1;
+      const right = left + 1;
+      let best = idx;
+      if (this.data[left].f < this.data[best].f) best = left;
+      if (right < len && this.data[right].f < this.data[best].f) best = right;
+      if (best !== idx) {
+        [this.data[idx], this.data[best]] = [this.data[best], this.data[idx]];
+        idx = best;
+      } else break;
+    }
+  }
+}
+
+// Generates fun, 100% solvable, and achievable puzzles via controlled random walk
+function generateSolvableTiles(cols: number, rows: number, customSteps?: number): number[] {
+  const n = cols * rows;
+  // Steps adjusted so casual players can win:
+  // 3x3 (Easy): 8 steps (solvable in ~8-12 moves)
+  // 4x3 (Medium): 11 steps (solvable in ~11-18 moves)
+  // 6x3 (Hard): 14 steps (solvable in ~14-24 moves)
+  const steps = customSteps ?? (n <= 9 ? 8 : n <= 12 ? 11 : 14);
+  let tiles: number[];
+  do {
+    tiles = [...Array(n).keys()];
+    let emptyIdx = n - 1;
+    let lastMoved = -1;
+
+    for (let s = 0; s < steps; s++) {
+      const allNeighbors = getNeighbors(emptyIdx, cols, rows);
+      const candidates = allNeighbors.filter(idx => tiles[idx] !== lastMoved);
+      const chosen = candidates.length > 0
+        ? candidates[Math.floor(Math.random() * candidates.length)]
+        : allNeighbors[0];
+      lastMoved = tiles[chosen];
+      tiles[emptyIdx] = tiles[chosen];
+      tiles[chosen] = n - 1;
+      emptyIdx = chosen;
+    }
+  } while (isSolved(tiles));
   return tiles;
+}
+
+// Intelligent Hint: Returns the index of the optimal tile adjacent to blank to slide
+function findBestHintMove(tiles: number[], cols: number, rows: number): number | null {
+  const n = cols * rows;
+  const emptyIdx = tiles.indexOf(n - 1);
+  if (emptyIdx === -1) return null;
+  const neighbors = getNeighbors(emptyIdx, cols, rows);
+  if (neighbors.length === 0) return null;
+
+  // 1. Direct win check
+  for (const idx of neighbors) {
+    const copy = [...tiles];
+    [copy[idx], copy[emptyIdx]] = [copy[emptyIdx], copy[idx]];
+    if (isSolved(copy)) return idx;
+  }
+
+  // 2. Best greedy neighbor fallback
+  let bestFallback = neighbors[0];
+  let minCost = Infinity;
+  for (const idx of neighbors) {
+    const copy = [...tiles];
+    [copy[idx], copy[emptyIdx]] = [copy[emptyIdx], copy[idx]];
+    const h = heuristic(copy, cols, rows);
+    const bonus = (copy[idx] === idx ? -2 : 0) + (copy[emptyIdx] === emptyIdx ? -2 : 0);
+    const cost = h + bonus;
+    if (cost < minCost) {
+      minCost = cost;
+      bestFallback = idx;
+    }
+  }
+
+  // 3. Fast MinHeap A*
+  const heap = new MinHeap();
+  heap.push({
+    tiles,
+    emptyIdx,
+    firstMove: null,
+    g: 0,
+    f: heuristic(tiles, cols, rows),
+  });
+
+  const visited = new Map<string, number>();
+  visited.set(tiles.join(','), 0);
+  let iterations = 0;
+  const maxIterations = 2500;
+
+  while (heap.size() > 0 && iterations < maxIterations) {
+    iterations++;
+    const curr = heap.pop()!;
+
+    if (isSolved(curr.tiles)) {
+      return curr.firstMove;
+    }
+
+    if (curr.g >= 14) continue;
+
+    const currNeighbors = getNeighbors(curr.emptyIdx, cols, rows);
+    for (const nIdx of currNeighbors) {
+      const nextTiles = [...curr.tiles];
+      [nextTiles[nIdx], nextTiles[curr.emptyIdx]] = [nextTiles[curr.emptyIdx], nextTiles[nIdx]];
+      const key = nextTiles.join(',');
+      const nextG = curr.g + 1;
+
+      if (visited.has(key) && (visited.get(key) as number) <= nextG) continue;
+      visited.set(key, nextG);
+
+      const firstMove = curr.firstMove === null ? nIdx : curr.firstMove;
+      const h = heuristic(nextTiles, cols, rows);
+      heap.push({
+        tiles: nextTiles,
+        emptyIdx: nIdx,
+        firstMove,
+        g: nextG,
+        f: nextG + h,
+      });
+    }
+  }
+
+  return bestFallback;
 }
 
 type PuzzleLocalState = {
@@ -175,6 +369,8 @@ type PuzzleLocalState = {
   levelMoves: number[];
   done: boolean[];
   submitted: boolean;
+  hintsLeft?: number;
+  showNumbers?: boolean;
 };
 
 // =========================================================================
@@ -218,6 +414,13 @@ function PuzzlePage() {
   const [levelTimes, setLevelTimes] = useState<number[]>([0, 0, 0]);
   const [levelMovesArr, setLevelMovesArr] = useState<number[]>([0, 0, 0]);
   const [doneLevels, setDoneLevels] = useState<boolean[]>([false, false, false]);
+
+  // Hints, Badges & Preview State
+  const [hintsLeft, setHintsLeft] = useState<number>(5);
+  const [showNumbers, setShowNumbers] = useState<boolean>(true);
+  const [showPeekModal, setShowPeekModal] = useState<boolean>(false);
+  const [hintNotice, setHintNotice] = useState<string | null>(null);
+  const [hintTileIdx, setHintTileIdx] = useState<number | null>(null);
 
   // Modals & UI
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
@@ -374,6 +577,10 @@ function PuzzlePage() {
           setLevelTimes(parsed.levelTimeSeconds ?? [0, 0, 0]);
           setLevelMovesArr(parsed.levelMoves ?? [0, 0, 0]);
           setDoneLevels(parsed.done ?? [false, false, false]);
+          setHintsLeft(typeof parsed.hintsLeft === 'number' ? parsed.hintsLeft : 5);
+          if (typeof parsed.showNumbers === 'boolean') {
+            setShowNumbers(parsed.showNumbers);
+          }
           // Note: isGameActive stays false on load/refresh until user clicks "Resume Play"!
           return;
         }
@@ -394,6 +601,7 @@ function PuzzlePage() {
     setLevelTimes([0, 0, 0]);
     setLevelMovesArr([0, 0, 0]);
     setDoneLevels([false, false, false]);
+    setHintsLeft(5);
     setIsGameActive(false);
   }, [isLoadingConfig, isEnabled, hasAttemptedToday, todayIST]);
 
@@ -422,10 +630,11 @@ function PuzzlePage() {
     const shuffled = generateSolvableTiles(targetCols, targetRows);
     setTiles(shuffled);
     setMoves(0);
+    setHintsLeft(5);
     setSessionElapsed(0);
     sessionStartTsRef.current = Date.now();
     setIsGameActive(true);
-    saveStateToStorage({ tiles: shuffled, moves: 0 });
+    saveStateToStorage({ tiles: shuffled, moves: 0, hintsLeft: 5 });
   };
 
   // Resume Play: continues previous game with saved timer and moves!
@@ -454,6 +663,8 @@ function PuzzlePage() {
           levelMoves: levelMovesArr,
           done: doneLevels,
           submitted: hasAttemptedToday,
+          hintsLeft,
+          showNumbers,
           ...override,
         };
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
@@ -471,8 +682,51 @@ function PuzzlePage() {
       levelMovesArr,
       doneLevels,
       hasAttemptedToday,
+      hintsLeft,
+      showNumbers,
     ]
   );
+
+  // Use 1 of 5 Hints to automatically make the optimal move
+  const handleUseHint = () => {
+    if (!isGameActive || hasAttemptedToday || doneLevels[currentLevelIdx]) return;
+    if (hintsLeft <= 0) {
+      setHintNotice('No hints left for this level!');
+      setTimeout(() => setHintNotice(null), 2500);
+      return;
+    }
+
+    const { cols, rows } = currentLevel;
+    const bestMoveIdx = findBestHintMove(tiles, cols, rows);
+    if (bestMoveIdx === null) return;
+
+    const emptyIdx = tiles.indexOf(tiles.length - 1);
+    if (emptyIdx === -1) return;
+
+    // Flash the tile that was hinted
+    setHintTileIdx(bestMoveIdx);
+    setTimeout(() => setHintTileIdx(null), 1200);
+
+    // Swap tile with empty slot
+    const newTiles = [...tiles];
+    [newTiles[bestMoveIdx], newTiles[emptyIdx]] = [newTiles[emptyIdx], newTiles[bestMoveIdx]];
+    const newMoves = moves + 1;
+    const newHintsLeft = hintsLeft - 1;
+
+    setTiles(newTiles);
+    setMoves(newMoves);
+    setHintsLeft(newHintsLeft);
+
+    setHintNotice(`💡 Hint used: Optimal tile moved! (${newHintsLeft} hints left)`);
+    setTimeout(() => setHintNotice(null), 2500);
+
+    // Check if level is solved
+    if (isSolved(newTiles)) {
+      handleLevelComplete(newTiles, newMoves);
+    } else {
+      saveStateToStorage({ tiles: newTiles, moves: newMoves, hintsLeft: newHintsLeft });
+    }
+  };
 
   // Sync state on unmount / page hide
   useEffect(() => {
@@ -581,6 +835,7 @@ function PuzzlePage() {
 
     setTiles(nextTiles);
     setMoves(0);
+    setHintsLeft(5);
     setSessionElapsed(0);
     sessionStartTsRef.current = Date.now();
     setIsGameActive(true);
@@ -589,6 +844,7 @@ function PuzzlePage() {
       level: nextLevelIdx,
       tiles: nextTiles,
       moves: 0,
+      hintsLeft: 5,
       unlocked: Math.max(unlockedLevel, nextLevelIdx),
     });
   };
@@ -716,6 +972,7 @@ function PuzzlePage() {
     let savedTimes = [...levelTimes];
     let savedMovesArr = [...levelMovesArr];
 
+    let savedHints = 5;
     try {
       const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (savedRaw) {
@@ -732,6 +989,7 @@ function PuzzlePage() {
           savedAccSec = parsed.accumulatedSeconds ?? savedAccSec;
           if (Array.isArray(parsed.levelTimeSeconds)) savedTimes = parsed.levelTimeSeconds;
           if (Array.isArray(parsed.levelMoves)) savedMovesArr = parsed.levelMoves;
+          if (typeof parsed.hintsLeft === 'number') savedHints = parsed.hintsLeft;
         }
       }
     } catch {}
@@ -764,6 +1022,8 @@ function PuzzlePage() {
       levelMoves: savedMovesArr,
       done: newDone,
       submitted: false,
+      hintsLeft: savedHints,
+      showNumbers,
     };
 
     try {
@@ -784,6 +1044,7 @@ function PuzzlePage() {
     setLevelTimes(savedTimes);
     setLevelMovesArr(savedMovesArr);
     setTiles(activeTiles);
+    setHintsLeft(savedHints);
 
     sessionStartTsRef.current = Date.now();
     setIsGameActive(true);
@@ -1000,7 +1261,7 @@ function PuzzlePage() {
 
           {/* HUD Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 bg-pink-50/70 border-2 border-[#1C332E] rounded-2xl p-3 shadow-[2px_2px_0px_#1C332E]">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 bg-[#FBF0C8] border-2 border-[#1C332E] px-3 py-1 rounded-full text-xs sm:text-sm font-extrabold text-[#1C332E]">
                 <Timer size={15} />
                 <span>⏱ {formatTime(totalLiveSeconds)}</span>
@@ -1008,9 +1269,51 @@ function PuzzlePage() {
               <span className="inline-flex items-center gap-1.5 bg-[#BAE6FD] border-2 border-[#1C332E] px-3 py-1 rounded-full text-xs sm:text-sm font-extrabold text-[#1C332E]">
                 <span>🎯 Moves: {totalLiveMoves}</span>
               </span>
+
+              {/* 💡 5 Hints Button */}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleUseHint}
+                disabled={!isGameActive || doneLevels[currentLevelIdx] || hintsLeft <= 0}
+                className={`h-8 text-xs font-extrabold border-2 border-[#1C332E] rounded-full transition-all cursor-pointer ${
+                  hintsLeft > 0
+                    ? 'bg-amber-400 hover:bg-amber-500 text-amber-950 shadow-[2px_2px_0px_#1C332E]'
+                    : 'bg-muted text-muted-foreground opacity-60 border-dashed cursor-not-allowed'
+                }`}
+                title="Automatically slide the best piece towards the solution"
+              >
+                <Lightbulb size={13} className="mr-1 fill-amber-300" />
+                Hint ({hintsLeft}/5)
+              </Button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 🔢 Numbers Badge Toggle */}
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setShowNumbers((prev) => !prev)}
+                className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-pink-50 cursor-pointer"
+                title="Toggle tile number badges"
+              >
+                <Hash size={13} className="mr-1 text-pink-600" />
+                Numbers: {showNumbers ? 'ON' : 'OFF'}
+              </Button>
+
+              {/* 👁️ Peek Image Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setShowPeekModal(true)}
+                className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-emerald-50 text-emerald-800 cursor-pointer"
+                title="Preview solved artwork"
+              >
+                <Eye size={13} className="mr-1" /> Peek Image
+              </Button>
+
               {doneLevels[0] && !doneLevels[currentLevelIdx] && (
                 <Button
                   variant="outline"
@@ -1040,6 +1343,13 @@ function PuzzlePage() {
             </div>
           </div>
 
+          {/* 💡 Hint Notification Alert */}
+          {hintNotice && (
+            <div className="bg-amber-100 border-2 border-amber-600 text-amber-900 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 animate-pulse shadow-sm">
+              <Lightbulb size={16} className="text-amber-700 fill-amber-400" />
+              <span>{hintNotice}</span>
+            </div>
+          )}
 
           {/* Sliding Puzzle Grid */}
           <div className="w-full max-w-[540px] mx-auto relative">
@@ -1069,20 +1379,42 @@ function PuzzlePage() {
                 const rows = currentLevel.rows;
                 const posX = (tileVal % cols) * (100 / (cols - 1));
                 const posY = Math.floor(tileVal / cols) * (100 / (rows - 1));
+                const isCorrect = tileVal === idx;
+                const isHinted = hintTileIdx === idx;
 
                 return (
                   <button
                     key={`tile-${tileVal}`}
                     onClick={() => handleTileClick(idx)}
-                    className="relative aspect-square w-full h-full rounded-lg sm:rounded-xl border-2 border-[#1C332E] cursor-pointer hover:brightness-105 active:brightness-90 overflow-hidden shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    className={`relative aspect-square w-full h-full rounded-lg sm:rounded-xl border-2 cursor-pointer hover:brightness-105 active:brightness-90 overflow-hidden shadow-sm focus:outline-none transition-all duration-200 ${
+                      isHinted
+                        ? 'border-amber-400 ring-4 ring-amber-400 scale-95 z-10 shadow-[0_0_15px_rgba(251,191,36,0.9)]'
+                        : isCorrect
+                        ? 'border-emerald-600/90'
+                        : 'border-[#1C332E]'
+                    }`}
                     style={{
                       backgroundImage: `url(${currentLevel.image})`,
                       backgroundSize: `${cols * 100}% ${rows * 100}%`,
                       backgroundPosition: `${posX}% ${posY}%`,
                       backgroundRepeat: 'no-repeat',
                     }}
-                    aria-label={`Move tile`}
-                  />
+                    aria-label={`Move tile ${tileVal + 1}`}
+                  >
+                    {/* 🔢 Tile Number Badge */}
+                    {showNumbers && (
+                      <span
+                        className={`absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs font-black select-none pointer-events-none shadow-md backdrop-blur-sm flex items-center gap-0.5 ${
+                          isCorrect
+                            ? 'bg-emerald-600/90 text-white border border-emerald-300 ring-1 ring-emerald-400'
+                            : 'bg-black/75 text-white border border-white/30'
+                        }`}
+                      >
+                        {isCorrect && <span className="text-[9px] font-black leading-none">✓</span>}
+                        <span>{tileVal + 1}</span>
+                      </span>
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -1483,6 +1815,54 @@ function PuzzlePage() {
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* 👁️ PEEK ARTWORK PREVIEW MODAL */}
+      {showPeekModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-[#1C332E] rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-[8px_8px_0px_#1C332E] space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b-2 border-[#1C332E]/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{currentLevel.art}</span>
+                <div>
+                  <h3 className="font-extrabold text-foreground text-lg sm:text-xl font-['Baloo_2']">
+                    Level {currentLevelIdx + 1} ({currentLevel.name}) Solved Preview
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{currentLevel.desc}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPeekModal(false)}
+                className="w-8 h-8 rounded-full border-2 border-[#1C332E] flex items-center justify-center hover:bg-muted font-bold text-foreground cursor-pointer"
+                aria-label="Close Preview"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border-2.5 border-[#1C332E] shadow-inner bg-slate-900">
+              <img
+                src={currentLevel.image}
+                alt={currentLevel.name}
+                className="w-full object-contain max-h-[380px] mx-auto select-none pointer-events-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <span className="text-xs text-muted-foreground font-medium">
+                🎯 Target Grid: {currentLevel.cols} × {currentLevel.rows} tiles
+              </span>
+              <Button
+                type="button"
+                onClick={() => setShowPeekModal(false)}
+                className="bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] px-6 cursor-pointer text-xs sm:text-sm"
+              >
+                Back to Puzzle
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
