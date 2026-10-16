@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Flower2, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -7,6 +7,31 @@ export function SiteHeader() {
   const navigate = useNavigate();
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [isPuzzleEnabled, setIsPuzzleEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const cached = localStorage.getItem('pehchaan_puzzle_config_cache');
+      if (cached) {
+        return JSON.parse(cached).enabled !== false;
+      }
+    } catch {}
+    return true;
+  });
+
+  useEffect(() => {
+    fetch('/api/puzzle/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((cfg) => {
+        if (cfg && typeof cfg.enabled === 'boolean') {
+          setIsPuzzleEnabled(cfg.enabled);
+          try {
+            localStorage.setItem('pehchaan_puzzle_config_cache', JSON.stringify({ enabled: cfg.enabled }));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -62,18 +87,20 @@ export function SiteHeader() {
         <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
           <Link to="/leaderboard">Leaderboard</Link>
         </Button>
-        <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3 text-pink-700 font-bold hover:text-pink-800">
-          <Link to="/puzzle">
-            <span className="flex items-center gap-1">
-              <span>🧩</span>
-              <span className="hidden sm:inline">Puzzle</span>
-              <span className="sm:hidden">Puzzle</span>
-              <span className="text-[10px] bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded-full font-extrabold border border-pink-300">
-                +50 pts
+        {isPuzzleEnabled && (
+          <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3 text-pink-700 font-bold hover:text-pink-800">
+            <Link to="/puzzle">
+              <span className="flex items-center gap-1">
+                <span>🧩</span>
+                <span className="hidden sm:inline">Puzzle</span>
+                <span className="sm:hidden">Puzzle</span>
+                <span className="text-[10px] bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded-full font-extrabold border border-pink-300">
+                  +50 pts
+                </span>
               </span>
-            </span>
-          </Link>
-        </Button>
+            </Link>
+          </Button>
+        )}
       </nav>
       <Button asChild size="sm" className="h-8 sm:h-9 text-xs sm:text-sm px-3 font-bold shrink-0">
         <Link to="/challenge">

@@ -137,7 +137,11 @@ function AdminPage() {
       const cfgRes = await fetch('/api/puzzle/config');
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
-        setPuzzleEnabled(cfg.enabled !== false);
+        const isAct = cfg.enabled !== false;
+        setPuzzleEnabled(isAct);
+        try {
+          localStorage.setItem('pehchaan_puzzle_config_cache', JSON.stringify({ enabled: isAct }));
+        } catch {}
       }
       const statsRes = await fetch('/api/puzzle/stats');
       if (statsRes.ok) {
@@ -220,6 +224,9 @@ function AdminPage() {
       });
       if (res.ok) {
         setPuzzleEnabled(nextState);
+        try {
+          localStorage.setItem('pehchaan_puzzle_config_cache', JSON.stringify({ enabled: nextState }));
+        } catch {}
         fetchPuzzleAdminData();
       }
     } catch {

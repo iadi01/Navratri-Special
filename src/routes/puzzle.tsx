@@ -82,6 +82,7 @@ const LEVELS = [
 
 const LOCAL_STORAGE_KEY = 'pehchaan_navratri_puzzle_v2';
 const SUBMITTED_CACHE_KEY = 'pehchaan_puzzle_submitted_date';
+const PUZZLE_CONFIG_CACHE_KEY = 'pehchaan_puzzle_config_cache';
 
 function getTodayIST(): string {
   const d = new Date();
@@ -106,6 +107,18 @@ function checkLocalAttemptSync(): boolean {
     }
   } catch {}
   return false;
+}
+
+function checkLocalPuzzleEnabledSync(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const cached = localStorage.getItem(PUZZLE_CONFIG_CACHE_KEY);
+    if (cached !== null) {
+      const parsed = JSON.parse(cached);
+      return parsed.enabled === true;
+    }
+  } catch {}
+  return false; // Safe default: do NOT show game until verified from config or cache!
 }
 
 function formatTime(totalSeconds: number): string {
@@ -169,7 +182,7 @@ function PuzzlePage() {
   const todayIST = getTodayIST();
 
   // Admin Config & Enable status
-  const [isEnabled, setIsEnabled] = useState<boolean>(true);
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => checkLocalPuzzleEnabledSync());
   const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
 
   // User Profile
@@ -231,10 +244,14 @@ function PuzzlePage() {
         const cfgRes = await fetch('/api/puzzle/config');
         if (cfgRes.ok) {
           const cfg = await cfgRes.json();
-          setIsEnabled(cfg.enabled !== false);
+          const active = cfg.enabled !== false;
+          setIsEnabled(active);
+          try {
+            localStorage.setItem(PUZZLE_CONFIG_CACHE_KEY, JSON.stringify({ enabled: active }));
+          } catch {}
         }
       } catch {
-        setIsEnabled(true);
+        setIsEnabled((prev) => prev);
       } finally {
         setIsLoadingConfig(false);
       }
@@ -285,7 +302,7 @@ function PuzzlePage() {
 
   // 3. Initialize & Restore Board State from LocalStorage
   useEffect(() => {
-    if (hasAttemptedToday) return;
+    if (isLoadingConfig || !isEnabled || hasAttemptedToday) return;
 
     try {
       const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -322,7 +339,7 @@ function PuzzlePage() {
     setLevelMovesArr([0, 0, 0]);
     setDoneLevels([false, false, false]);
     setIsGameActive(false);
-  }, [hasAttemptedToday, todayIST]);
+  }, [isLoadingConfig, isEnabled, hasAttemptedToday, todayIST]);
 
   // 4. Live Timer Tick (ONLY runs when isGameActive is true!)
   useEffect(() => {
@@ -632,6 +649,14 @@ function PuzzlePage() {
         </p>
       </header>
 
+      {/* ⏳ CHECKING STATUS LOADER */}
+      {isLoadingConfig && (
+        <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-10 text-center shadow-[6px_6px_0px_#1C332E] space-y-3">
+          <div className="w-8 h-8 border-3 border-[#1C332E] border-t-pink-600 rounded-full animate-spin mx-auto" />
+          <p className="text-sm font-bold text-[#1C332E]">Checking challenge status...</p>
+        </div>
+      )}
+
       {/* ⚙️ OFFLINE STATE BANNER (If Admin Disabled) */}
       {!isLoadingConfig && !isEnabled && (
         <div className="bg-amber-50 border-3 border-[#1C332E] rounded-2xl p-6 text-center shadow-[6px_6px_0px_#1C332E] space-y-3">
@@ -651,52 +676,54 @@ function PuzzlePage() {
       )}
 
       {/* 👤 PLAYER IDENTITY BAR */}
-      <div className="bg-white border-3 border-[#1C332E] rounded-2xl p-4 shadow-[4px_4px_0px_#1C332E] flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-pink-100 border-2 border-[#1C332E] flex items-center justify-center text-pink-700 font-bold text-lg">
-            {userProfile?.fullName?.[0] || 'P'}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm sm:text-base text-foreground">
-                {userProfile ? userProfile.fullName : 'Guest Participant'}
-              </span>
-              {userProfile?.rollNo && (
-                <span className="text-[11px] font-mono px-2 py-0.5 bg-muted rounded border border-border text-muted-foreground">
-                  {userProfile.rollNo}
-                </span>
-              )}
+      {!isLoadingConfig && isEnabled && (
+        <div className="bg-white border-3 border-[#1C332E] rounded-2xl p-4 shadow-[4px_4px_0px_#1C332E] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-pink-100 border-2 border-[#1C332E] flex items-center justify-center text-pink-700 font-bold text-lg">
+              {userProfile?.fullName?.[0] || 'P'}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {userProfile ? `${userProfile.course} • ${userProfile.year}` : 'Enter your name to qualify for top 10 bonus points'}
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm sm:text-base text-foreground">
+                  {userProfile ? userProfile.fullName : 'Guest Participant'}
+                </span>
+                {userProfile?.rollNo && (
+                  <span className="text-[11px] font-mono px-2 py-0.5 bg-muted rounded border border-border text-muted-foreground">
+                    {userProfile.rollNo}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {userProfile ? `${userProfile.course} • ${userProfile.year}` : 'Enter your name to qualify for top 10 bonus points'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!userProfile ? (
+              <Button
+                size="sm"
+                onClick={() => setShowProfileModal(true)}
+                className="bg-pink-600 hover:bg-pink-700 text-white font-bold border-2 border-[#1C332E] shadow-[2px_2px_0px_#1C332E] text-xs"
+              >
+                Set Profile to Save Score
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowProfileModal(true)}
+                className="text-xs font-semibold border-2 border-[#1C332E]"
+              >
+                Edit Details
+              </Button>
+            )}
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {!userProfile ? (
-            <Button
-              size="sm"
-              onClick={() => setShowProfileModal(true)}
-              className="bg-pink-600 hover:bg-pink-700 text-white font-bold border-2 border-[#1C332E] shadow-[2px_2px_0px_#1C332E] text-xs"
-            >
-              Set Profile to Save Score
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowProfileModal(true)}
-              className="text-xs font-semibold border-2 border-[#1C332E]"
-            >
-              Edit Details
-            </Button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* 🏆 COMPLETED TODAY BANNER (Anti-Cheat 1-Attempt Record) */}
-      {hasAttemptedToday && (
+      {!isLoadingConfig && isEnabled && hasAttemptedToday && (
         <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-6 sm:p-8 shadow-[6px_6px_0px_#1C332E] text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-pink-100 border-3 border-[#1C332E] flex items-center justify-center text-pink-700 shadow-[3px_3px_0px_#1C332E]">
             <Trophy size={32} className="animate-bounce" />
@@ -755,7 +782,7 @@ function PuzzlePage() {
       )}
 
       {/* 🧩 MAIN PUZZLE INTERACTION CARD (Active Game) */}
-      {!hasAttemptedToday && isEnabled && (
+      {!isLoadingConfig && isEnabled && !hasAttemptedToday && (
         <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-4 sm:p-7 shadow-[6px_6px_0px_#1C332E] space-y-5">
           {/* Level Progress Indicator (Non-clickable: Once advanced, previous levels cannot be replayed) */}
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -912,7 +939,8 @@ function PuzzlePage() {
       )}
 
       {/* 🏆 LIVE SPEED LEADERBOARD (Top 10 Earn +50 Bonus Points) */}
-      <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-5 sm:p-7 shadow-[6px_6px_0px_#1C332E] space-y-4">
+      {!isLoadingConfig && isEnabled && (
+        <div className="bg-white border-3 border-[#1C332E] rounded-3xl p-5 sm:p-7 shadow-[6px_6px_0px_#1C332E] space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-border/70 pb-3">
           <div>
             <div className="flex items-center gap-2">
@@ -1044,6 +1072,7 @@ function PuzzlePage() {
           </div>
         )}
       </div>
+      )}
 
       {/* 🌟 LEVEL COMPLETE / PROCEED MODAL */}
       {showLevelModal && completedLevelInfo && (
