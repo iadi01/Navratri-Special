@@ -154,11 +154,11 @@ function getNeighbors(emptyIdx: number, cols: number, rows: number): number[] {
 // Generates fun, 100% solvable, and achievable puzzles via controlled random walk
 function generateSolvableTiles(cols: number, rows: number, customSteps?: number): number[] {
   const n = cols * rows;
-  // Controlled difficulty: casual-friendly, winnable in ~5-12 moves!
-  // 3x3 (Easy): 5 steps (solvable in ~5-7 moves)
-  // 4x3 (Medium): 7 steps (solvable in ~7-10 moves)
-  // 6x3 (Hard): 10 steps (solvable in ~10-14 moves)
-  const steps = customSteps ?? (n <= 9 ? 5 : n <= 12 ? 7 : 10);
+  // Controlled difficulty: balanced, engaging & winnable!
+  // 3x3 (Easy): 8 steps (solvable in ~8-12 moves)
+  // 4x3 (Medium): 12 steps (solvable in ~12-16 moves)
+  // 6x3 (Hard): 16 steps (solvable in ~16-22 moves)
+  const steps = customSteps ?? (n <= 9 ? 8 : n <= 12 ? 12 : 16);
   let tiles: number[];
   do {
     tiles = [...Array(n).keys()];
