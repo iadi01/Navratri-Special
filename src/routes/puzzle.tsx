@@ -152,15 +152,21 @@ function getNeighbors(emptyIdx: number, cols: number, rows: number): number[] {
 }
 
 // Generates fun, 100% solvable, and achievable puzzles via controlled random walk
+// Calibrated so full puzzle run takes ~150-200 moves across the 3 levels
 function generateSolvableTiles(cols: number, rows: number, customSteps?: number): number[] {
   const n = cols * rows;
-  // Controlled difficulty: balanced, engaging & winnable!
-  // 3x3 (Easy): 8 steps (solvable in ~8-12 moves)
-  // 4x3 (Medium): 12 steps (solvable in ~12-16 moves)
-  // 6x3 (Hard): 16 steps (solvable in ~16-22 moves)
-  const steps = customSteps ?? (n <= 9 ? 8 : n <= 12 ? 12 : 16);
+  // Steps & misplaced calibration for ~150 - 200 total moves:
+  // - 3x3 Easy (9 tiles): 45 shuffle steps, min 7 misplaced tiles (~40-50 human moves)
+  // - 4x3 Medium (12 tiles): 75 shuffle steps, min 10 misplaced tiles (~60-70 human moves)
+  // - 6x3 Hard (18 tiles): 110 shuffle steps, min 14 misplaced tiles (~80-95 human moves)
+  // Total moves combined = ~180-210 moves!
+  const steps = customSteps ?? (n <= 9 ? 45 : n <= 12 ? 75 : 110);
+  const minMisplaced = n <= 9 ? 7 : n <= 12 ? 10 : 14;
+
   let tiles: number[];
+  let attempts = 0;
   do {
+    attempts++;
     tiles = [...Array(n).keys()];
     let emptyIdx = n - 1;
     let lastMoved = -1;
@@ -176,7 +182,19 @@ function generateSolvableTiles(cols: number, rows: number, customSteps?: number)
       tiles[chosen] = n - 1;
       emptyIdx = chosen;
     }
-  } while (isSolved(tiles));
+
+    if (isSolved(tiles)) continue;
+
+    // Ensure sufficiently deep scramble so it requires the targeted move range
+    let misplaced = 0;
+    for (let i = 0; i < n; i++) {
+      if (tiles[i] !== i) misplaced++;
+    }
+    if (misplaced >= minMisplaced || attempts >= 40) {
+      break;
+    }
+  } while (true);
+
   return tiles;
 }
 
