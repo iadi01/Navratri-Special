@@ -237,6 +237,7 @@ function PuzzlePage() {
   // Timer reference
   const sessionStartTsRef = useRef<number>(Date.now());
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isContinuingRef = useRef<boolean>(false);
 
   const currentLevel = LEVELS[currentLevelIdx] || LEVELS[0];
   const totalLiveSeconds = accumulatedSeconds + (isGameActive ? sessionElapsed : 0);
@@ -305,7 +306,7 @@ function PuzzlePage() {
                   parsed &&
                   parsed.date === todayIST &&
                   parsed.submitted === false &&
-                  Number(parsed.level ?? 0) >= Number(data.existingScore?.completedLevels ?? 0)
+                  Number(parsed.level ?? 0) >= Math.min(2, Number(data.existingScore?.completedLevels ?? 0))
                 ) {
                   isContinuing = true;
                 }
@@ -328,6 +329,11 @@ function PuzzlePage() {
   // 3. Initialize & Restore Board State from LocalStorage
   useEffect(() => {
     if (isLoadingConfig || !isEnabled || hasAttemptedToday) return;
+
+    if (isContinuingRef.current) {
+      isContinuingRef.current = false;
+      return;
+    }
 
     try {
       const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -408,7 +414,7 @@ function PuzzlePage() {
   // 5. Auto-Save State to LocalStorage on changes
   const saveStateToStorage = useCallback(
     (override?: Partial<PuzzleLocalState>) => {
-      if (hasAttemptedToday) return;
+      if (hasAttemptedToday && override?.submitted !== false) return;
       try {
         const currentElapsedNow = isGameActive ? Math.max(0, Math.floor((Date.now() - sessionStartTsRef.current) / 1000)) : 0;
         const payload: PuzzleLocalState = {
@@ -669,9 +675,14 @@ function PuzzlePage() {
   };
 
   // User continuation: if they stopped & submitted at Level 1 or Level 2, continue right from where they left off!
-  const handleContinueNextLevel = () => {
-    const nextLvl = Number(serverExistingScore?.completedLevels || 1);
-    if (nextLvl >= LEVELS.length) return;
+  const handleContinueNextLevel = (forcedTargetLvl?: number) => {
+    // When completedLevels is 1 -> targetIdx is 1 (Level 2: Medium)
+    // When completedLevels is 2 -> targetIdx is 2 (Level 3: Hard)
+    const targetIdx = typeof forcedTargetLvl === 'number'
+      ? forcedTargetLvl
+      : Number(serverExistingScore?.completedLevels ?? 1);
+
+    if (targetIdx >= LEVELS.length) return;
 
     // Check if there is an in-progress local save for this level
     let savedTiles: number[] | null = null;
@@ -687,9 +698,9 @@ function PuzzlePage() {
         if (
           parsed &&
           parsed.date === todayIST &&
-          parsed.level === nextLvl &&
+          parsed.level === targetIdx &&
           Array.isArray(parsed.tiles) &&
-          parsed.tiles.length === LEVELS[nextLvl].cols * LEVELS[nextLvl].rows
+          parsed.tiles.length === LEVELS[targetIdx].cols * LEVELS[targetIdx].rows
         ) {
           savedTiles = parsed.tiles;
           savedMoves = parsed.moves ?? 0;
@@ -701,45 +712,53 @@ function PuzzlePage() {
     } catch {}
 
     const newDone = [false, false, false];
-    for (let i = 0; i < nextLvl; i++) newDone[i] = true;
-    setDoneLevels(newDone);
+    for (let i = 0; i < targetIdx; i++) newDone[i] = true;
 
-    setCurrentLevelIdx(nextLvl);
-    setUnlockedLevel(nextLvl);
-    setAccumulatedSeconds(savedAccSec);
-    setSessionElapsed(0);
-    setMoves(savedMoves);
-
-    if (nextLvl > 0 && (!savedTimes[nextLvl - 1] || savedTimes[nextLvl - 1] === 0)) {
-      savedTimes[nextLvl - 1] = savedAccSec;
+    if (targetIdx > 0 && (!savedTimes[targetIdx - 1] || savedTimes[targetIdx - 1] === 0)) {
+      savedTimes[targetIdx - 1] = savedAccSec;
     }
-    if (nextLvl > 0 && (!savedMovesArr[nextLvl - 1] || savedMovesArr[nextLvl - 1] === 0)) {
-      savedMovesArr[nextLvl - 1] = Number(serverExistingScore?.totalMoves || 0);
+    if (targetIdx > 0 && (!savedMovesArr[targetIdx - 1] || savedMovesArr[targetIdx - 1] === 0)) {
+      savedMovesArr[targetIdx - 1] = Number(serverExistingScore?.totalMoves || 0);
     }
-    setLevelTimes(savedTimes);
-    setLevelMovesArr(savedMovesArr);
 
     // If no previous in-progress board exists, generate solvable tiles for next level
-    const targetCols = LEVELS[nextLvl].cols;
-    const targetRows = LEVELS[nextLvl].rows;
+    const targetCols = LEVELS[targetIdx].cols;
+    const targetRows = LEVELS[targetIdx].rows;
     const activeTiles = savedTiles || generateSolvableTiles(targetCols, targetRows);
-    setTiles(activeTiles);
+
+    // DIRECTLY WRITE TO LOCALSTORAGE BEFORE ANY REACT STATE UPDATES!
+    const newPayload: PuzzleLocalState = {
+      date: todayIST,
+      level: targetIdx,
+      unlocked: targetIdx,
+      tiles: activeTiles,
+      moves: savedMoves,
+      totalMoves: savedMovesArr.reduce((a, b) => a + b, 0) + savedMoves,
+      accumulatedSeconds: savedAccSec,
+      levelTimeSeconds: savedTimes,
+      levelMoves: savedMovesArr,
+      done: newDone,
+      submitted: false,
+    };
 
     try {
       localStorage.removeItem(SUBMITTED_CACHE_KEY);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPayload));
     } catch {}
 
-    saveStateToStorage({
-      level: nextLvl,
-      unlocked: nextLvl,
-      tiles: activeTiles,
-      moves: savedMoves,
-      accumulatedSeconds: savedAccSec,
-      done: newDone,
-      levelTimeSeconds: savedTimes,
-      levelMoves: savedMovesArr,
-      submitted: false,
-    });
+    // Set flag so useEffect 3 doesn't overwrite what we just initialized
+    isContinuingRef.current = true;
+
+    // Update all React states
+    setDoneLevels(newDone);
+    setCurrentLevelIdx(targetIdx);
+    setUnlockedLevel(targetIdx);
+    setAccumulatedSeconds(savedAccSec);
+    setSessionElapsed(0);
+    setMoves(savedMoves);
+    setLevelTimes(savedTimes);
+    setLevelMovesArr(savedMovesArr);
+    setTiles(activeTiles);
 
     sessionStartTsRef.current = Date.now();
     setIsGameActive(true);
@@ -898,7 +917,7 @@ function PuzzlePage() {
                 You cleared Level {serverExistingScore.completedLevels}. Continue Level {Number(serverExistingScore.completedLevels) + 1} to reach up to 50 total points!
               </p>
               <Button
-                onClick={handleContinueNextLevel}
+                onClick={() => handleContinueNextLevel(Number(serverExistingScore.completedLevels))}
                 className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm py-2.5 px-6 rounded-xl cursor-pointer"
               >
                 Continue Level {Number(serverExistingScore.completedLevels) + 1} ({LEVELS[Number(serverExistingScore.completedLevels)].name}) (+{Number(serverExistingScore.completedLevels) === 1 ? 15 : 20} pts) →
