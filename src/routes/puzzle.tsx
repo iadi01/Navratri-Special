@@ -1439,7 +1439,7 @@ function PuzzlePage() {
                 </label>
                 <Input
                   required
-                  placeholder="e.g. Hasini Sharma"
+                  placeholder="e.g. Amity Sharma"
                   value={fullNameInput}
                   onChange={(e) => setFullNameInput(e.target.value)}
                   className="border-2 border-[#1C332E] font-medium"
