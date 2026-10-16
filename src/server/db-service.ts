@@ -1295,3 +1295,58 @@ export async function getPuzzleStatsFromMongo(): Promise<{
   }
 }
 
+export async function deletePuzzleScoreInMongo(params: {
+  id?: string;
+  username?: string;
+  rollNo?: string;
+  date?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { success: false, error: 'Database not connected.' };
+    }
+
+    const puzzleScoresCol = db.collection('puzzle_scores');
+    const conditions: any[] = [];
+
+    if (params.id) {
+      conditions.push({ id: params.id });
+      try {
+        const { ObjectId } = await import('mongodb');
+        if (ObjectId.isValid(params.id)) {
+          conditions.push({ _id: new ObjectId(params.id) });
+        }
+      } catch {}
+    }
+
+    const cleanUsername = (params.username || '').trim();
+    if (cleanUsername) {
+      const esc = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      conditions.push({ username: { $regex: new RegExp(`^${esc}$`, 'i') } });
+      conditions.push({ fullName: { $regex: new RegExp(`^${esc}$`, 'i') } });
+    }
+
+    const cleanRollNo = (params.rollNo || '').trim().toUpperCase();
+    if (cleanRollNo) {
+      conditions.push({ rollNo: cleanRollNo });
+    }
+
+    if (conditions.length === 0) {
+      return { success: false, error: 'No identifier provided to delete puzzle record.' };
+    }
+
+    const filter: any = conditions.length === 1 ? { ...conditions[0] } : { $or: conditions };
+
+    if (params.date && params.date !== 'all') {
+      filter.date = params.date;
+    }
+
+    await puzzleScoresCol.deleteMany(filter);
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error deleting puzzle score from Mongo:', err);
+    return { success: false, error: err?.message || 'Failed to delete puzzle score from database.' };
+  }
+}
+

@@ -25,6 +25,7 @@ import {
   savePuzzleScoreToMongo,
   getPuzzleLeaderboardFromMongo,
   getPuzzleStatsFromMongo,
+  deletePuzzleScoreInMongo,
 } from "./server/db-service";
 
 type ServerEntry = {
@@ -440,6 +441,23 @@ export default {
       } catch (err: any) {
         return new Response(JSON.stringify({ totalAttemptsToday: 0, fastestTimeSeconds: null, top10BonusAwardedCount: 0, enabled: true }), {
           status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    // 🗑️ Delete Puzzle Score / Solver (Admin)
+    if ((url.pathname === '/api/puzzle/delete-score' || url.pathname === '/api/admin/delete-puzzle-score') && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const res = await deletePuzzleScoreInMongo(body);
+        return new Response(JSON.stringify(res), {
+          status: res.success ? 200 : 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, error: err?.message }), {
+          status: 500,
           headers: { 'content-type': 'application/json' },
         });
       }

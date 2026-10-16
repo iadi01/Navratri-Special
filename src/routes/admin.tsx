@@ -293,6 +293,61 @@ function AdminPage() {
     }
   };
 
+  const [puzzleSearch, setPuzzleSearch] = useState<string>('');
+  const [deletingPuzzleId, setDeletingPuzzleId] = useState<string | null>(null);
+
+  const handleDeletePuzzleSubmission = async (sub: any) => {
+    const name = sub.fullName || sub.username || 'this participant';
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete "${name}" from MongoDB puzzle records? This will allow them to replay the puzzle if needed.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingPuzzleId(sub.id || sub.username);
+    try {
+      const res = await fetch('/api/puzzle/delete-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: sub.id,
+          username: sub.username,
+          rollNo: sub.rollNo,
+          date: sub.date,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await loadPuzzleSubmissions();
+        const statsRes = await fetch('/api/puzzle/stats');
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          setPuzzleStats(stats);
+        }
+      } else {
+        alert(data.error || 'Failed to delete puzzle submission.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Network error deleting puzzle submission.');
+    } finally {
+      setDeletingPuzzleId(null);
+    }
+  };
+
+  const filteredPuzzleSubmissions = useMemo(() => {
+    if (!puzzleSearch.trim()) return puzzleSubmissions;
+    const q = puzzleSearch.toLowerCase();
+    return puzzleSubmissions.filter(
+      (s: any) =>
+        (s.fullName || '').toLowerCase().includes(q) ||
+        (s.username || '').toLowerCase().includes(q) ||
+        (s.rollNo || '').toLowerCase().includes(q) ||
+        (s.course || '').toLowerCase().includes(q)
+    );
+  }, [puzzleSubmissions, puzzleSearch]);
+
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session.user) return;
@@ -734,24 +789,34 @@ function AdminPage() {
             {/* Submissions List Table */}
             {showPuzzleSubmissions && (
               <div className="mt-3 pt-3 border-t border-border/60 space-y-2.5 animate-in fade-in-50 duration-200">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <h3 className="text-xs font-bold text-foreground">
-                    All MongoDB Puzzle Solvers ({puzzleSubmissions.length})
+                    All MongoDB Puzzle Solvers ({filteredPuzzleSubmissions.length})
                   </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={loadPuzzleSubmissions}
-                    disabled={isLoadingPuzzleSubmissions}
-                    className="text-xs h-7"
-                  >
-                    Refresh List
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search solver by name / roll..."
+                      value={puzzleSearch}
+                      onChange={(e) => setPuzzleSearch(e.target.value)}
+                      className="h-7 text-xs w-48 font-medium"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadPuzzleSubmissions}
+                      disabled={isLoadingPuzzleSubmissions}
+                      className="text-xs h-7"
+                    >
+                      Refresh List
+                    </Button>
+                  </div>
                 </div>
                 {isLoadingPuzzleSubmissions ? (
                   <p className="text-xs text-muted-foreground text-center py-4">Loading from MongoDB...</p>
-                ) : puzzleSubmissions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">No puzzle submissions saved in MongoDB yet.</p>
+                ) : filteredPuzzleSubmissions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    {puzzleSubmissions.length === 0 ? 'No puzzle submissions saved in MongoDB yet.' : 'No matching puzzle submissions found.'}
+                  </p>
                 ) : (
                   <div className="overflow-x-auto max-h-72 overflow-y-auto border border-border rounded-lg">
                     <table className="w-full text-left text-xs">
@@ -764,22 +829,39 @@ function AdminPage() {
                           <th className="py-2 px-3 text-right">Time</th>
                           <th className="py-2 px-3 text-right">Moves</th>
                           <th className="py-2 px-3 text-right">Date</th>
+                          <th className="py-2 px-3 text-center">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
-                        {puzzleSubmissions.map((sub, i) => (
-                          <tr key={sub.id || i} className="hover:bg-muted/30">
-                            <td className="py-2 px-3 font-semibold text-foreground">{sub.fullName || sub.username}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{sub.course || 'BCA'} {sub.rollNo ? `• ${sub.rollNo}` : ''}</td>
-                            <td className="py-2 px-3 text-center font-bold text-pink-700">{sub.completedLevels}/3</td>
-                            <td className="py-2 px-3 text-center font-mono font-bold text-pink-600">
-                              +{sub.pointsEarned ?? (sub.completedLevels >= 3 ? 50 : sub.completedLevels === 2 ? 30 : 15)} PTS
-                            </td>
-                            <td className="py-2 px-3 text-right font-mono font-medium">{sub.totalTimeSeconds}s</td>
-                            <td className="py-2 px-3 text-right font-mono text-muted-foreground">{sub.totalMoves}</td>
-                            <td className="py-2 px-3 text-right text-muted-foreground">{sub.date}</td>
-                          </tr>
-                        ))}
+                        {filteredPuzzleSubmissions.map((sub, i) => {
+                          const isDel = deletingPuzzleId === (sub.id || sub.username);
+                          return (
+                            <tr key={sub.id || i} className="hover:bg-muted/30">
+                              <td className="py-2 px-3 font-semibold text-foreground">{sub.fullName || sub.username}</td>
+                              <td className="py-2 px-3 text-muted-foreground">{sub.course || 'BCA'} {sub.rollNo ? `• ${sub.rollNo}` : ''}</td>
+                              <td className="py-2 px-3 text-center font-bold text-pink-700">{sub.completedLevels}/3</td>
+                              <td className="py-2 px-3 text-center font-mono font-bold text-pink-600">
+                                +{sub.pointsEarned ?? (sub.completedLevels >= 3 ? 50 : sub.completedLevels === 2 ? 30 : 15)} PTS
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-medium">{sub.totalTimeSeconds}s</td>
+                              <td className="py-2 px-3 text-right font-mono text-muted-foreground">{sub.totalMoves}</td>
+                              <td className="py-2 px-3 text-right text-muted-foreground">{sub.date}</td>
+                              <td className="py-2 px-3 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeletePuzzleSubmission(sub)}
+                                  disabled={isDel}
+                                  className="h-6 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive text-[11px] font-bold cursor-pointer transition-colors"
+                                  title="Permanently delete puzzle record from MongoDB"
+                                >
+                                  <Trash2 size={12} className="mr-1" />
+                                  {isDel ? 'Deleting...' : 'Delete'}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
