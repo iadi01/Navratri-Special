@@ -743,6 +743,7 @@ function AdminPage() {
                           <th className="py-2 px-3">Participant</th>
                           <th className="py-2 px-3">Course / Roll</th>
                           <th className="py-2 px-3 text-center">Levels</th>
+                          <th className="py-2 px-3 text-center">Points</th>
                           <th className="py-2 px-3 text-right">Time</th>
                           <th className="py-2 px-3 text-right">Moves</th>
                           <th className="py-2 px-3 text-right">Date</th>
@@ -754,6 +755,9 @@ function AdminPage() {
                             <td className="py-2 px-3 font-semibold text-foreground">{sub.fullName || sub.username}</td>
                             <td className="py-2 px-3 text-muted-foreground">{sub.course || 'BCA'} {sub.rollNo ? `• ${sub.rollNo}` : ''}</td>
                             <td className="py-2 px-3 text-center font-bold text-pink-700">{sub.completedLevels}/3</td>
+                            <td className="py-2 px-3 text-center font-mono font-bold text-pink-600">
+                              +{sub.pointsEarned ?? (sub.completedLevels >= 3 ? 50 : sub.completedLevels === 2 ? 30 : 15)} PTS
+                            </td>
                             <td className="py-2 px-3 text-right font-mono font-medium">{sub.totalTimeSeconds}s</td>
                             <td className="py-2 px-3 text-right font-mono text-muted-foreground">{sub.totalMoves}</td>
                             <td className="py-2 px-3 text-right text-muted-foreground">{sub.date}</td>

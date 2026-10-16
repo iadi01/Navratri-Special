@@ -850,6 +850,7 @@ export type PuzzleSubmission = {
   completedLevels: number; // 1, 2, or 3
   totalTimeSeconds: number;
   totalMoves: number;
+  pointsEarned?: number; // 15, 30, or 50
   levelBreakdown?: PuzzleLevelScore[];
   clientIp?: string;
   submittedAt?: string;
@@ -867,6 +868,7 @@ export type PuzzleLeaderboardEntry = {
   completedLevels: number;
   totalTimeSeconds: number;
   totalMoves: number;
+  pointsEarned?: number;
   rank: number;
   isTop10: boolean;
   bonusPoints: number;
@@ -978,6 +980,7 @@ export async function checkPuzzleAttemptInMongo(
     });
 
     if (existing) {
+      const calcPoints = (lvls: number) => (lvls >= 3 ? 50 : lvls === 2 ? 30 : lvls === 1 ? 15 : 0);
       return {
         attempted: true,
         reason: `Participant "${existing.fullName || existing.username}" has already completed today's Navratri puzzle challenge.`,
@@ -990,6 +993,7 @@ export async function checkPuzzleAttemptInMongo(
           completedLevels: existing.completedLevels,
           totalTimeSeconds: existing.totalTimeSeconds,
           totalMoves: existing.totalMoves,
+          pointsEarned: existing.pointsEarned ?? calcPoints(existing.completedLevels || 0),
           bonusAwarded: existing.bonusAwarded,
           bonusPoints: existing.bonusPoints,
           submittedAt: existing.submittedAt,
@@ -1076,6 +1080,12 @@ export async function savePuzzleScoreToMongo(
 
     const isTop10 = rank <= (config.topLimit || 10);
     const bonusPoints = 0; // Strict: Puzzle score is stored separately in MongoDB without adding points to quiz leaderboard
+    
+    // Points system: Level 1 = 15, Level 2 = 30 (15+15), Level 3 = 50 (15+15+20)
+    const pointsEarned = submission.pointsEarned ?? (
+      currentLevels >= 3 ? 50 : currentLevels === 2 ? 30 : currentLevels === 1 ? 15 : 0
+    );
+
     const entryId = submission.id || `puzzle-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date();
 
@@ -1093,6 +1103,7 @@ export async function savePuzzleScoreToMongo(
       completedLevels: currentLevels,
       totalTimeSeconds: currentTime,
       totalMoves: currentMoves,
+      pointsEarned,
       levelBreakdown: submission.levelBreakdown || [],
       bonusAwarded: false, // Strict: No points added to general leaderboard
       bonusPoints: 0,
@@ -1130,6 +1141,7 @@ export async function savePuzzleScoreToMongo(
       success: true,
       isTop10,
       rank,
+      pointsEarned,
       bonusPoints: 0,
     };
   } catch (err: any) {
@@ -1159,6 +1171,8 @@ export async function getPuzzleLeaderboardFromMongo(
     return entries.map((e, index) => {
       const rank = index + 1;
       const isTop10 = rank <= 10;
+      const lvls = Number(e.completedLevels || 1);
+      const pts = e.pointsEarned ?? (lvls >= 3 ? 50 : lvls === 2 ? 30 : 15);
       return {
         id: e.id || e._id?.toString(),
         username: e.username || '',
@@ -1168,9 +1182,10 @@ export async function getPuzzleLeaderboardFromMongo(
         batch: e.batch || '',
         rollNo: e.rollNo || '',
         date: e.date || targetDate,
-        completedLevels: Number(e.completedLevels || 1),
+        completedLevels: lvls,
         totalTimeSeconds: Number(e.totalTimeSeconds || 0),
         totalMoves: Number(e.totalMoves || 0),
+        pointsEarned: pts,
         rank,
         isTop10,
         bonusPoints: 0,

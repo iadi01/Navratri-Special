@@ -20,7 +20,8 @@ import {
   Crown,
   Eye,
   EyeOff,
-  Sparkles
+  Sparkles,
+  Share2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ import {
   type UserProfile
 } from '@/lib/leaderboard-store';
 import { getAdminSession } from '@/lib/admin-store';
+import { PuzzleShareModal } from '@/components/puzzle-share-modal';
 
 export const Route = createFileRoute('/puzzle')({
   head: () => ({
@@ -240,6 +242,7 @@ function PuzzlePage() {
     return s.isAuthenticated && s.user?.role === 'main_admin';
   });
   const [adminShowTargetArtwork, setAdminShowTargetArtwork] = useState<boolean>(false);
+  const [showShareModal, setShowShareModal] = useState<boolean>(false);
 
   // Timer reference
   const sessionStartTsRef = useRef<number>(Date.now());
@@ -572,6 +575,9 @@ function PuzzlePage() {
     }
 
     const count = completedCount ?? doneLevels.filter(Boolean).length;
+    // Points system: Level 1 = 15, Level 2 = 30 (15+15), Level 3 = 50 (15+15+20)
+    const points = count >= 3 ? 50 : count === 2 ? 30 : count === 1 ? 15 : 0;
+
     const timeSec = finalTotalSeconds ?? totalLiveSeconds;
     const totalMoves = finalTotalMoves ?? levelMovesArr.reduce((a, b) => a + b, 0) + moves;
     const times = timesArr ?? levelTimes;
@@ -598,6 +604,7 @@ function PuzzlePage() {
         completedLevels: count,
         totalTimeSeconds: timeSec,
         totalMoves: totalMoves,
+        pointsEarned: points,
         levelBreakdown: breakdown,
         submittedAt: new Date().toISOString(),
       };
@@ -612,8 +619,16 @@ function PuzzlePage() {
       if (res.ok && data.success) {
         setHasAttemptedToday(true);
         setSubmissionResult(data);
+        setServerExistingScore({
+          completedLevels: count,
+          totalTimeSeconds: timeSec,
+          totalMoves: totalMoves,
+          pointsEarned: data.pointsEarned ?? points,
+          rank: data.rank,
+        });
         saveStateToStorage({ submitted: true });
         fetchLeaderboard();
+        setShowShareModal(true);
       } else {
         alert(data.error || 'Failed to submit puzzle score.');
       }
@@ -886,7 +901,15 @@ function PuzzlePage() {
               <div className="bg-white border-2 border-[#1C332E] rounded-xl p-3 shadow-[2px_2px_0px_#1C332E]">
                 <span className="text-xs text-muted-foreground block">Levels Solved</span>
                 <span className="text-lg font-extrabold text-foreground">
-                  {serverExistingScore.completedLevels || 3}/3
+                  {serverExistingScore.completedLevels || 1}/3
+                </span>
+              </div>
+              <div className="bg-white border-2 border-[#1C332E] rounded-xl p-3 shadow-[2px_2px_0px_#1C332E]">
+                <span className="text-xs text-muted-foreground block">Points Earned</span>
+                <span className="text-lg font-extrabold text-pink-600 font-mono">
+                  +{serverExistingScore.pointsEarned ?? (
+                    (serverExistingScore.completedLevels || 1) >= 3 ? 50 : (serverExistingScore.completedLevels || 1) === 2 ? 30 : 15
+                  )} PTS
                 </span>
               </div>
               <div className="bg-white border-2 border-[#1C332E] rounded-xl p-3 shadow-[2px_2px_0px_#1C332E]">
@@ -901,17 +924,17 @@ function PuzzlePage() {
                   {serverExistingScore.totalMoves || 0}
                 </span>
               </div>
-              <div className="bg-white border-2 border-[#1C332E] rounded-xl p-3 shadow-[2px_2px_0px_#1C332E]">
-                <span className="text-xs text-muted-foreground block">Daily Standing</span>
-                <span className="text-base font-extrabold text-pink-600 flex items-center justify-center gap-1">
-                  {serverExistingScore.rank ? `Rank #${serverExistingScore.rank} 🏆` : 'Recorded 🏆'}
-                </span>
-              </div>
             </div>
           )}
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <Button asChild className="bg-pink-600 hover:bg-pink-700 font-bold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E]">
+            <Button
+              onClick={() => setShowShareModal(true)}
+              className="bg-pink-600 hover:bg-pink-700 font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-white flex items-center gap-1.5 cursor-pointer"
+            >
+              <Share2 size={16} /> Share 4:5 Card on BeSocial
+            </Button>
+            <Button asChild className="bg-amber-500 hover:bg-amber-600 text-amber-950 font-bold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E]">
               <Link to="/challenge">Play Daily Quiz Hunt <ArrowRight size={14} className="ml-1" /></Link>
             </Button>
             <Button asChild variant="outline" className="border-2 border-[#1C332E] font-bold">
@@ -942,11 +965,12 @@ function PuzzlePage() {
               const isCurrent = idx === currentLevelIdx;
               const isDone = doneLevels[idx];
               const isLocked = idx > currentLevelIdx;
+              const levelPts = idx === 0 ? '15 pts' : idx === 1 ? '+15 pts (30 total)' : '+20 pts (50 total)';
 
               return (
                 <div
                   key={lv.name}
-                  className={`px-4 py-2 rounded-xl font-bold font-['Baloo_2'] text-sm sm:text-base border-2.5 border-[#1C332E] flex items-center gap-1.5 select-none transition-all ${
+                  className={`px-3.5 py-1.5 rounded-xl font-bold font-['Baloo_2'] text-xs sm:text-sm border-2.5 border-[#1C332E] flex items-center gap-1.5 select-none transition-all ${
                     isCurrent
                       ? 'bg-pink-600 text-white shadow-[3px_3px_0px_#1C332E]'
                       : isDone
@@ -955,7 +979,7 @@ function PuzzlePage() {
                   }`}
                 >
                   <span>{lv.art}</span>
-                  <span>{isDone ? `✓ ${lv.name} (Done)` : isCurrent ? `${lv.name} (Playing)` : lv.name}</span>
+                  <span>{isDone ? `✓ ${lv.name} (${levelPts})` : isCurrent ? `${lv.name} · ${levelPts}` : `${lv.name} (${levelPts})`}</span>
                   {isLocked && <Lock size={12} className="ml-0.5 text-muted-foreground/60" />}
                 </div>
               );
@@ -974,15 +998,34 @@ function PuzzlePage() {
               </span>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReshuffle}
-              disabled={!isGameActive || doneLevels[currentLevelIdx]}
-              className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-amber-50"
-            >
-              <Shuffle size={13} className="mr-1" /> Reshuffle
-            </Button>
+            <div className="flex items-center gap-2">
+              {doneLevels[0] && !doneLevels[currentLevelIdx] && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const completedCount = doneLevels.filter(Boolean).length;
+                    const pts = completedCount >= 2 ? 30 : 15;
+                    if (window.confirm(`Kya aap game yahin stop karke apna ${pts} points ka score submit karna chahte hain?`)) {
+                      submitPuzzleScore(completedCount);
+                    }
+                  }}
+                  className="h-8 text-xs font-bold border-2 border-pink-600 text-pink-700 bg-white hover:bg-pink-50 cursor-pointer"
+                >
+                  🏁 Stop & Submit ({doneLevels[1] ? '30 pts' : '15 pts'})
+                </Button>
+              )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReshuffle}
+                disabled={!isGameActive || doneLevels[currentLevelIdx]}
+                className="h-8 text-xs font-bold border-2 border-[#1C332E] bg-white hover:bg-amber-50"
+              >
+                <Shuffle size={13} className="mr-1" /> Reshuffle
+              </Button>
+            </div>
           </div>
 
           {/* 🎯 MAIN ADMIN TARGET ARTWORK PREVIEW (Concealed from Students & Sub-Admins) */}
@@ -1164,9 +1207,11 @@ function PuzzlePage() {
                   <th className="py-2.5 px-3">Rank</th>
                   <th className="py-2.5 px-3">Participant</th>
                   <th className="py-2.5 px-3 text-center">Levels</th>
+                  <th className="py-2.5 px-3 text-center">Score</th>
                   <th className="py-2.5 px-3 text-right">Time</th>
                   <th className="py-2.5 px-3 text-right">Moves</th>
                   <th className="py-2.5 px-3 text-right">Standing</th>
+                  <th className="py-2.5 px-3 text-center">4:5 Card</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 font-medium">
@@ -1176,6 +1221,9 @@ function PuzzlePage() {
                   const isCurrent = userProfile && (
                     (userProfile.rollNo && entry.rollNo === userProfile.rollNo) ||
                     entry.username.toLowerCase() === userProfile.username.toLowerCase()
+                  );
+                  const entryPoints = entry.pointsEarned ?? (
+                    entry.completedLevels >= 3 ? 50 : entry.completedLevels === 2 ? 30 : 15
                   );
 
                   return (
@@ -1229,6 +1277,12 @@ function PuzzlePage() {
                         </span>
                       </td>
 
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <span className="font-extrabold text-pink-700 font-mono text-xs">
+                          +{entryPoints} PTS
+                        </span>
+                      </td>
+
                       <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap">
                         {formatTime(entry.totalTimeSeconds)}
                       </td>
@@ -1254,6 +1308,20 @@ function PuzzlePage() {
                           {rank === 1 ? '🥇 #1 Winner' : rank === 2 ? '🥈 #2 Runner-up' : rank === 3 ? '🥉 #3' : `Rank #${rank}`}
                         </span>
                       </td>
+
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setServerExistingScore(entry);
+                            setShowShareModal(true);
+                          }}
+                          className="h-7 px-2 text-[11px] font-bold text-pink-600 hover:bg-pink-50 hover:text-pink-700 border border-pink-200 cursor-pointer"
+                        >
+                          <Share2 size={12} className="mr-1" /> BeSocial
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1272,38 +1340,55 @@ function PuzzlePage() {
               {completedLevelInfo.isLast ? '🏆🎉🏆' : '🎉✨🎉'}
             </div>
 
-            <h3 className="text-2xl font-extrabold text-pink-700 font-['Baloo_2']">
-              {completedLevelInfo.isLast
-                ? 'Sab Levels Complete! 🏆'
-                : `${LEVELS[completedLevelInfo.level].name} Complete!`}
-            </h3>
+            <div className="space-y-1">
+              <span className="inline-block text-xs font-bold uppercase tracking-wider px-3 py-1 bg-pink-100 text-pink-800 rounded-full border border-pink-300">
+                {completedLevelInfo.isLast
+                  ? 'All 3 Levels Solved · +50 Points Earned!'
+                  : completedLevelInfo.level === 0
+                  ? 'Level 1 Solved · +15 Points Earned!'
+                  : 'Level 2 Solved · +30 Points Earned!'}
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-[#1C332E] font-['Baloo_2']">
+                {completedLevelInfo.isLast
+                  ? 'Sab Levels Complete! 🏆'
+                  : `${LEVELS[completedLevelInfo.level].name} Complete! 🎉`}
+              </h3>
+            </div>
 
-            <p className="text-sm text-muted-foreground">
-              {completedLevelInfo.isLast ? (
-                <>
-                  You completed all 3 levels in{' '}
-                  <span className="font-bold text-foreground font-mono">
-                    {formatTime(completedLevelInfo.time)}
-                  </span>{' '}
-                  with{' '}
-                  <span className="font-bold text-foreground font-mono">
-                    {completedLevelInfo.moves} moves
+            <div className="bg-pink-50/70 border-2 border-[#1C332E] rounded-2xl p-3.5 space-y-1.5 text-center">
+              <div className="flex items-center justify-around text-xs font-bold text-foreground">
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Time</span>
+                  <span className="font-mono text-sm">{formatTime(completedLevelInfo.time)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Moves</span>
+                  <span className="font-mono text-sm">{completedLevelInfo.moves} moves</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Score</span>
+                  <span className="text-pink-600 text-sm font-extrabold">
+                    +{completedLevelInfo.level === 0 ? 15 : completedLevelInfo.level === 1 ? 30 : 50} PTS
                   </span>
-                  . Tumne poora puzzle jeet liya — Shubh Navratri! 🌸
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {completedLevelInfo.isLast ? (
+                <>Tumne poora puzzle master kar liya aur maximum <strong>50 points</strong> earn kar liye — Shubh Navratri! 🌸</>
+              ) : completedLevelInfo.level === 0 ? (
+                <>
+                  Tumne Level 1 complete karke <strong className="text-foreground">15 Points</strong> earn kar liye!
+                  <span className="block mt-1 font-bold text-[#1C332E]">
+                    Kya Medium level khelna chahte ho (+15 pts)? Ya yahin 15 points submit karke score record karna hai?
+                  </span>
                 </>
               ) : (
                 <>
-                  Completed in{' '}
-                  <span className="font-bold text-foreground font-mono">
-                    {formatTime(completedLevelInfo.time)}
-                  </span>{' '}
-                  with{' '}
-                  <span className="font-bold text-foreground font-mono">
-                    {completedLevelInfo.moves} moves
-                  </span>
-                  .{' '}
-                  <span className="block mt-1 font-bold text-foreground">
-                    Kya {LEVELS[completedLevelInfo.level + 1].name} level kheloge?
+                  Tumne Level 2 complete karke <strong className="text-foreground">30 Points</strong> earn kar liye!
+                  <span className="block mt-1 font-bold text-[#1C332E]">
+                    Kya Hard level khelna chahte ho (+20 pts)? Ya yahin 30 points submit karke score record karna hai?
                   </span>
                 </>
               )}
@@ -1314,9 +1399,9 @@ function PuzzlePage() {
                 <>
                   <Button
                     onClick={() => proceedToNextLevel(completedLevelInfo.level + 1)}
-                    className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white font-bold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E]"
+                    className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm cursor-pointer"
                   >
-                    Yes, Play {LEVELS[completedLevelInfo.level + 1].name}! 🌺
+                    Yes, Play {LEVELS[completedLevelInfo.level + 1].name}! 🌺 (+{completedLevelInfo.level === 0 ? 15 : 20} pts)
                   </Button>
                   <Button
                     variant="outline"
@@ -1324,17 +1409,20 @@ function PuzzlePage() {
                       setShowLevelModal(false);
                       submitPuzzleScore(completedLevelInfo.level + 1);
                     }}
-                    className="w-full sm:w-auto border-2 border-[#1C332E] font-bold text-xs"
+                    className="w-full sm:w-auto border-2 border-[#1C332E] font-bold text-xs hover:bg-amber-50 cursor-pointer"
                   >
-                    Submit Score Now
+                    Stop & Submit ({completedLevelInfo.level === 0 ? '15 Points' : '30 Points'}) ✓
                   </Button>
                 </>
               ) : (
                 <Button
-                  onClick={() => setShowLevelModal(false)}
-                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E]"
+                  onClick={() => {
+                    setShowLevelModal(false);
+                    setShowShareModal(true);
+                  }}
+                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Awesome, View My Ranking! 🌟
+                  <Share2 size={16} /> Share 4:5 Card on BeSocial! 🌟
                 </Button>
               )}
             </div>
@@ -1427,6 +1515,47 @@ function PuzzlePage() {
           </form>
         </div>
       )}
+
+      {/* 📸 BeSocial 4:5 Scorecard Modal */}
+      <PuzzleShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        completedLevels={
+          serverExistingScore?.completedLevels ??
+          doneLevels.filter(Boolean).length ??
+          1
+        }
+        totalTimeSeconds={
+          serverExistingScore?.totalTimeSeconds ??
+          totalLiveSeconds ??
+          0
+        }
+        totalMoves={
+          serverExistingScore?.totalMoves ??
+          moves ??
+          0
+        }
+        pointsEarned={
+          serverExistingScore?.pointsEarned ??
+          (doneLevels.filter(Boolean).length >= 3
+            ? 50
+            : doneLevels.filter(Boolean).length === 2
+            ? 30
+            : 15)
+        }
+        rank={serverExistingScore?.rank}
+        fullName={serverExistingScore?.fullName || userProfile?.fullName || userProfile?.username || 'Pehchaan Kaun Player'}
+        course={serverExistingScore?.course || userProfile?.course || 'BCA'}
+        year={serverExistingScore?.year || userProfile?.year || '1st Sem'}
+        rollNo={serverExistingScore?.rollNo || userProfile?.rollNo}
+        levelImage={
+          (serverExistingScore?.completedLevels || doneLevels.filter(Boolean).length) >= 3
+            ? '/navratri-puzzle-art-2.jpg'
+            : (serverExistingScore?.completedLevels || doneLevels.filter(Boolean).length) === 2
+            ? '/navratri-puzzle-art-1.jpg'
+            : '/navratri-puzzle-art-0.jpg'
+        }
+      />
     </div>
   );
 }
