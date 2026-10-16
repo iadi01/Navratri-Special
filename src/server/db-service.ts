@@ -1075,11 +1075,11 @@ export async function savePuzzleScoreToMongo(
     }
 
     const isTop10 = rank <= (config.topLimit || 10);
-    const bonusPoints = isTop10 ? (config.bonusPoints || 50) : 0;
+    const bonusPoints = 0; // Strict: Puzzle score is stored separately in MongoDB without adding points to quiz leaderboard
     const entryId = submission.id || `puzzle-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date();
 
-    // 4. Save puzzle score
+    // 4. Save puzzle score separately in puzzle_scores collection
     await puzzleScoresCol.insertOne({
       id: entryId,
       username: cleanUsername,
@@ -1094,15 +1094,15 @@ export async function savePuzzleScoreToMongo(
       totalTimeSeconds: currentTime,
       totalMoves: currentMoves,
       levelBreakdown: submission.levelBreakdown || [],
-      bonusAwarded: isTop10,
-      bonusPoints,
+      bonusAwarded: false, // Strict: No points added to general leaderboard
+      bonusPoints: 0,
       rank,
       clientIp: clientIp || submission.clientIp || '',
       submittedAt: submission.submittedAt || now.toISOString(),
       createdAt: now,
     });
 
-    // 5. Update users collection profile
+    // 5. Update users collection profile (only academic identity info, no quiz marks added)
     const usersCol = db.collection('users');
     await usersCol.updateOne(
       { username: cleanUsername.toLowerCase() },
@@ -1130,7 +1130,7 @@ export async function savePuzzleScoreToMongo(
       success: true,
       isTop10,
       rank,
-      bonusPoints,
+      bonusPoints: 0,
     };
   } catch (err: any) {
     console.error('Failed to save puzzle score to Mongo:', err?.message);
@@ -1149,9 +1149,10 @@ export async function getPuzzleLeaderboardFromMongo(
 
     const puzzleScoresCol = db.collection('puzzle_scores');
     const targetDate = dateStr || getTodayIST();
+    const query = dateStr === 'all' ? {} : { date: targetDate };
 
     const entries = await puzzleScoresCol
-      .find({ date: targetDate })
+      .find(query)
       .sort({ completedLevels: -1, totalTimeSeconds: 1, totalMoves: 1, createdAt: 1 })
       .toArray();
 
@@ -1172,7 +1173,7 @@ export async function getPuzzleLeaderboardFromMongo(
         totalMoves: Number(e.totalMoves || 0),
         rank,
         isTop10,
-        bonusPoints: isTop10 ? 50 : 0,
+        bonusPoints: 0,
         submittedAt: e.submittedAt || '',
         levelBreakdown: e.levelBreakdown || [],
       };
@@ -1185,6 +1186,7 @@ export async function getPuzzleLeaderboardFromMongo(
 
 export async function getPuzzleStatsFromMongo(): Promise<{
   totalAttemptsToday: number;
+  totalAttemptsAllTime: number;
   fastestTimeSeconds: number | null;
   top10BonusAwardedCount: number;
   enabled: boolean;
@@ -1194,6 +1196,7 @@ export async function getPuzzleStatsFromMongo(): Promise<{
     if (!db || !status.connected) {
       return {
         totalAttemptsToday: 0,
+        totalAttemptsAllTime: 0,
         fastestTimeSeconds: null,
         top10BonusAwardedCount: 0,
         enabled: true,
@@ -1206,12 +1209,11 @@ export async function getPuzzleStatsFromMongo(): Promise<{
 
     const todayAttempts = await puzzleScoresCol.find({ date: today }).toArray();
     const totalAttemptsToday = todayAttempts.length;
+    const totalAttemptsAllTime = await puzzleScoresCol.countDocuments();
 
     let fastestTimeSeconds: number | null = null;
-    let top10BonusAwardedCount = 0;
 
     for (const a of todayAttempts) {
-      if (a.bonusAwarded) top10BonusAwardedCount++;
       const time = Number(a.totalTimeSeconds || 0);
       if (time > 0 && (fastestTimeSeconds === null || time < fastestTimeSeconds)) {
         fastestTimeSeconds = time;
@@ -1220,13 +1222,15 @@ export async function getPuzzleStatsFromMongo(): Promise<{
 
     return {
       totalAttemptsToday,
+      totalAttemptsAllTime,
       fastestTimeSeconds,
-      top10BonusAwardedCount,
+      top10BonusAwardedCount: 0,
       enabled: config.enabled,
     };
   } catch (err) {
     return {
       totalAttemptsToday: 0,
+      totalAttemptsAllTime: 0,
       fastestTimeSeconds: null,
       top10BonusAwardedCount: 0,
       enabled: true,

@@ -95,7 +95,7 @@ export function SiteHeader() {
                 <span className="hidden sm:inline">Puzzle</span>
                 <span className="sm:hidden">Puzzle</span>
                 <span className="text-[10px] bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded-full font-extrabold border border-pink-300">
-                  +50 pts
+                  Play
                 </span>
               </span>
             </Link>

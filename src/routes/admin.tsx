@@ -131,6 +131,21 @@ function AdminPage() {
     top10BonusAwardedCount: 0,
   });
   const [isTogglingPuzzle, setIsTogglingPuzzle] = useState<boolean>(false);
+  const [puzzleSubmissions, setPuzzleSubmissions] = useState<any[]>([]);
+  const [showPuzzleSubmissions, setShowPuzzleSubmissions] = useState<boolean>(false);
+  const [isLoadingPuzzleSubmissions, setIsLoadingPuzzleSubmissions] = useState<boolean>(false);
+
+  const loadPuzzleSubmissions = async () => {
+    setIsLoadingPuzzleSubmissions(true);
+    try {
+      const res = await fetch('/api/puzzle/leaderboard?date=all');
+      if (res.ok) {
+        const data = await res.json();
+        setPuzzleSubmissions(Array.isArray(data) ? data : []);
+      }
+    } catch {}
+    setIsLoadingPuzzleSubmissions(false);
+  };
 
   const fetchPuzzleAdminData = async () => {
     try {
@@ -572,7 +587,7 @@ function AdminPage() {
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Control the special Navratri sliding puzzle game globally. When enabled, users can play Easy, Medium & Hard levels to win +50 bonus points.
+                  Control the special Navratri sliding puzzle game globally. When enabled, users can play Easy, Medium & Hard levels. Puzzle scores are tracked separately in MongoDB and never added to the main quiz leaderboard.
                 </p>
               </div>
 
@@ -622,12 +637,84 @@ function AdminPage() {
                 </span>
               </div>
               <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50 col-span-2 sm:col-span-1">
-                <span className="text-xs text-muted-foreground block">Top 10 Bonus Awardees</span>
-                <span className="text-base font-bold text-pink-600">
-                  {puzzleStats.top10BonusAwardedCount} rewarded (+50 pts)
+                <span className="text-xs text-muted-foreground block">Leaderboard Status</span>
+                <span className="text-base font-bold text-emerald-600 flex items-center gap-1">
+                  Separated in MongoDB ✓
                 </span>
               </div>
             </div>
+
+            {/* View MongoDB Submissions Toggle */}
+            <div className="mt-4 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                All puzzle runs are stored safely in MongoDB in the <code className="text-pink-600 font-mono font-semibold">puzzle_scores</code> collection.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!showPuzzleSubmissions) {
+                    loadPuzzleSubmissions();
+                  }
+                  setShowPuzzleSubmissions(!showPuzzleSubmissions);
+                }}
+                className="text-xs font-bold"
+              >
+                {showPuzzleSubmissions ? 'Hide Solvers List' : 'View Solvers in MongoDB'}
+              </Button>
+            </div>
+
+            {/* Submissions List Table */}
+            {showPuzzleSubmissions && (
+              <div className="mt-3 pt-3 border-t border-border/60 space-y-2.5 animate-in fade-in-50 duration-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-foreground">
+                    All MongoDB Puzzle Solvers ({puzzleSubmissions.length})
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={loadPuzzleSubmissions}
+                    disabled={isLoadingPuzzleSubmissions}
+                    className="text-xs h-7"
+                  >
+                    Refresh List
+                  </Button>
+                </div>
+                {isLoadingPuzzleSubmissions ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Loading from MongoDB...</p>
+                ) : puzzleSubmissions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No puzzle submissions saved in MongoDB yet.</p>
+                ) : (
+                  <div className="overflow-x-auto max-h-72 overflow-y-auto border border-border rounded-lg">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-muted/80 sticky top-0 font-bold border-b border-border text-muted-foreground">
+                        <tr>
+                          <th className="py-2 px-3">Participant</th>
+                          <th className="py-2 px-3">Course / Roll</th>
+                          <th className="py-2 px-3 text-center">Levels</th>
+                          <th className="py-2 px-3 text-right">Time</th>
+                          <th className="py-2 px-3 text-right">Moves</th>
+                          <th className="py-2 px-3 text-right">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {puzzleSubmissions.map((sub, i) => (
+                          <tr key={sub.id || i} className="hover:bg-muted/30">
+                            <td className="py-2 px-3 font-semibold text-foreground">{sub.fullName || sub.username}</td>
+                            <td className="py-2 px-3 text-muted-foreground">{sub.course || 'BCA'} {sub.rollNo ? `• ${sub.rollNo}` : ''}</td>
+                            <td className="py-2 px-3 text-center font-bold text-pink-700">{sub.completedLevels}/3</td>
+                            <td className="py-2 px-3 text-right font-mono font-medium">{sub.totalTimeSeconds}s</td>
+                            <td className="py-2 px-3 text-right font-mono text-muted-foreground">{sub.totalMoves}</td>
+                            <td className="py-2 px-3 text-right text-muted-foreground">{sub.date}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-card border border-border rounded-xl p-5 md:p-6 shadow-sm">

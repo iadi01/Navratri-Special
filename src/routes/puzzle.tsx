@@ -32,10 +32,10 @@ export const Route = createFileRoute('/puzzle')({
       { title: 'Navratri Sliding Puzzle — पहचानो कौन?' },
       {
         name: 'description',
-        content: 'Solve the festive Navratri sliding puzzle! Top 10 fastest players win +50 bonus points. Play Easy, Medium & Hard levels.',
+        content: 'Solve the festive Navratri sliding puzzle! Complete Easy, Medium & Hard levels in record time.',
       },
       { property: 'og:title', content: 'Navratri Sliding Puzzle Challenge — पहचानो कौन?' },
-      { property: 'og:description', content: 'Can you solve the puzzle fastest? Win +50 Bonus Points!' },
+      { property: 'og:description', content: 'Can you solve the puzzle fastest? Test your speed on the puzzle leaderboard!' },
       { property: 'og:type', content: 'website' },
       { name: 'twitter:card', content: 'summary_large_image' },
     ],
@@ -644,7 +644,7 @@ function PuzzlePage() {
         <p className="text-sm sm:text-base text-muted-foreground font-medium max-w-xl mx-auto">
           Unscramble the sacred Durga Puja artwork! Complete Easy, Medium & Hard levels.{' '}
           <span className="font-bold text-foreground">
-            Top 10 fastest solvers receive <span className="text-pink-600 bg-pink-50 px-2 py-0.5 rounded border border-pink-200">+50 Bonus Points</span>!
+            Fastest solvers are ranked on today's speed leaderboard!
           </span>
         </p>
       </header>
@@ -762,9 +762,9 @@ function PuzzlePage() {
                 </span>
               </div>
               <div className="bg-white border-2 border-[#1C332E] rounded-xl p-3 shadow-[2px_2px_0px_#1C332E]">
-                <span className="text-xs text-muted-foreground block">Speed Bonus</span>
+                <span className="text-xs text-muted-foreground block">Daily Standing</span>
                 <span className="text-base font-extrabold text-pink-600 flex items-center justify-center gap-1">
-                  {serverExistingScore.bonusAwarded ? '+50 pts 🌟' : 'Ranked'}
+                  {serverExistingScore.rank ? `Rank #${serverExistingScore.rank} 🏆` : 'Recorded 🏆'}
                 </span>
               </div>
             </div>
@@ -948,7 +948,7 @@ function PuzzlePage() {
                 Today's Speed Leaderboard ⚡
               </h2>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-700 border border-pink-300">
-                Top 10 win +50 pts
+                Fastest Solvers
               </span>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">
@@ -971,7 +971,7 @@ function PuzzlePage() {
           <div className="text-center py-8 text-muted-foreground space-y-2">
             <p className="font-semibold text-sm text-foreground">No puzzle submissions yet today!</p>
             <p className="text-xs max-w-sm mx-auto">
-              Be the first to unscramble the tiles and claim the #1 spot with +50 Bonus Points!
+              Be the first to unscramble the tiles and claim the #1 spot on today's speed leaderboard!
             </p>
           </div>
         ) : (
@@ -984,7 +984,7 @@ function PuzzlePage() {
                   <th className="py-2.5 px-3 text-center">Levels</th>
                   <th className="py-2.5 px-3 text-right">Time</th>
                   <th className="py-2.5 px-3 text-right">Moves</th>
-                  <th className="py-2.5 px-3 text-right">Bonus Points</th>
+                  <th className="py-2.5 px-3 text-right">Standing</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 font-medium">
@@ -1056,13 +1056,21 @@ function PuzzlePage() {
                       </td>
 
                       <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                        {isTop10 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-100 text-pink-700 font-extrabold text-xs border border-pink-300">
-                            <Star size={11} className="fill-pink-600" /> +50 pts
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-xs border ${
+                            rank === 1
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : rank === 2
+                              ? 'bg-slate-100 text-slate-800 border-slate-300'
+                              : rank === 3
+                              ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              : isTop10
+                              ? 'bg-pink-50 text-pink-700 border-pink-200'
+                              : 'text-muted-foreground border-transparent'
+                          }`}
+                        >
+                          {rank === 1 ? '🥇 #1 Winner' : rank === 2 ? '🥈 #2 Runner-up' : rank === 3 ? '🥉 #3' : `Rank #${rank}`}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -1169,7 +1177,7 @@ function PuzzlePage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Please enter your academic details to submit puzzle scores and claim the +50 speed bonus points!
+              Please enter your academic details to record your official puzzle run and ranking in MongoDB!
             </p>
 
             <div className="space-y-3">
