@@ -240,6 +240,7 @@ function PuzzlePage() {
 
   const currentLevel = LEVELS[currentLevelIdx] || LEVELS[0];
   const totalLiveSeconds = accumulatedSeconds + (isGameActive ? sessionElapsed : 0);
+  const totalLiveMoves = levelMovesArr.reduce((a, b) => a + b, 0) + moves;
 
   // 1. Fetch Admin Puzzle Config & Leaderboard
   useEffect(() => {
@@ -667,13 +668,37 @@ function PuzzlePage() {
     }
   };
 
-  // User continuation: if they stopped & submitted at Level 1 or Level 2, they can continue later today!
+  // User continuation: if they stopped & submitted at Level 1 or Level 2, continue right from where they left off!
   const handleContinueNextLevel = () => {
     const nextLvl = Number(serverExistingScore?.completedLevels || 1);
     if (nextLvl >= LEVELS.length) return;
 
-    const prevTime = Number(serverExistingScore?.totalTimeSeconds || accumulatedSeconds || 0);
-    const prevMoves = Number(serverExistingScore?.totalMoves || moves || 0);
+    // Check if there is an in-progress local save for this level
+    let savedTiles: number[] | null = null;
+    let savedMoves = 0;
+    let savedAccSec = Number(serverExistingScore?.totalTimeSeconds || accumulatedSeconds || 0);
+    let savedTimes = [...levelTimes];
+    let savedMovesArr = [...levelMovesArr];
+
+    try {
+      const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedRaw) {
+        const parsed = JSON.parse(savedRaw);
+        if (
+          parsed &&
+          parsed.date === todayIST &&
+          parsed.level === nextLvl &&
+          Array.isArray(parsed.tiles) &&
+          parsed.tiles.length === LEVELS[nextLvl].cols * LEVELS[nextLvl].rows
+        ) {
+          savedTiles = parsed.tiles;
+          savedMoves = parsed.moves ?? 0;
+          savedAccSec = parsed.accumulatedSeconds ?? savedAccSec;
+          if (Array.isArray(parsed.levelTimeSeconds)) savedTimes = parsed.levelTimeSeconds;
+          if (Array.isArray(parsed.levelMoves)) savedMovesArr = parsed.levelMoves;
+        }
+      }
+    } catch {}
 
     const newDone = [false, false, false];
     for (let i = 0; i < nextLvl; i++) newDone[i] = true;
@@ -681,22 +706,24 @@ function PuzzlePage() {
 
     setCurrentLevelIdx(nextLvl);
     setUnlockedLevel(nextLvl);
-    setAccumulatedSeconds(prevTime);
+    setAccumulatedSeconds(savedAccSec);
     setSessionElapsed(0);
-    setMoves(0);
+    setMoves(savedMoves);
 
-    const newTimes = [...levelTimes];
-    newTimes[nextLvl - 1] = prevTime;
-    setLevelTimes(newTimes);
+    if (nextLvl > 0 && (!savedTimes[nextLvl - 1] || savedTimes[nextLvl - 1] === 0)) {
+      savedTimes[nextLvl - 1] = savedAccSec;
+    }
+    if (nextLvl > 0 && (!savedMovesArr[nextLvl - 1] || savedMovesArr[nextLvl - 1] === 0)) {
+      savedMovesArr[nextLvl - 1] = Number(serverExistingScore?.totalMoves || 0);
+    }
+    setLevelTimes(savedTimes);
+    setLevelMovesArr(savedMovesArr);
 
-    const newMoves = [...levelMovesArr];
-    newMoves[nextLvl - 1] = prevMoves;
-    setLevelMovesArr(newMoves);
-
+    // If no previous in-progress board exists, generate solvable tiles for next level
     const targetCols = LEVELS[nextLvl].cols;
     const targetRows = LEVELS[nextLvl].rows;
-    const nextTiles = generateSolvableTiles(targetCols, targetRows);
-    setTiles(nextTiles);
+    const activeTiles = savedTiles || generateSolvableTiles(targetCols, targetRows);
+    setTiles(activeTiles);
 
     try {
       localStorage.removeItem(SUBMITTED_CACHE_KEY);
@@ -705,16 +732,17 @@ function PuzzlePage() {
     saveStateToStorage({
       level: nextLvl,
       unlocked: nextLvl,
-      tiles: nextTiles,
-      moves: 0,
-      accumulatedSeconds: prevTime,
+      tiles: activeTiles,
+      moves: savedMoves,
+      accumulatedSeconds: savedAccSec,
       done: newDone,
-      levelTimeSeconds: newTimes,
-      levelMoves: newMoves,
+      levelTimeSeconds: savedTimes,
+      levelMoves: savedMovesArr,
       submitted: false,
     });
 
-    setIsGameActive(false);
+    sessionStartTsRef.current = Date.now();
+    setIsGameActive(true);
     setHasAttemptedToday(false);
   };
 
@@ -862,20 +890,18 @@ function PuzzlePage() {
 
           {/* 🌺 Continue Next Level Option for Partial Completion */}
           {serverExistingScore && Number(serverExistingScore.completedLevels || 0) < 3 && (
-            <div className="bg-emerald-50 border-2.5 border-[#1C332E] rounded-2xl p-4 sm:p-5 max-w-lg mx-auto space-y-2.5 text-center shadow-[4px_4px_0px_#1C332E]">
+            <div className="bg-emerald-50 border-2.5 border-[#1C332E] rounded-2xl p-4 max-w-lg mx-auto space-y-2 text-center shadow-[4px_4px_0px_#1C332E]">
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold">
-                <span>⚡</span> Partial Completion Saved · Aage Khelne Ka Option Khula Hai!
+                <span>⚡</span> Partial Score Saved: +{serverExistingScore.pointsEarned ?? (Number(serverExistingScore.completedLevels) === 1 ? 15 : 30)} PTS
               </div>
-              <p className="text-xs sm:text-sm text-emerald-950 font-medium leading-relaxed">
-                Aapne Level {serverExistingScore.completedLevels} submit karke{' '}
-                <strong className="text-pink-700">+{serverExistingScore.pointsEarned ?? (Number(serverExistingScore.completedLevels) === 1 ? 15 : 30)} PTS</strong> secure kar liye hain.
-                Agar aapka mann kare, toh aap yahin se Level {Number(serverExistingScore.completedLevels) + 1} ({LEVELS[Number(serverExistingScore.completedLevels)].name}) continue karke maximum <strong>50 points</strong> tak earn kar sakte hain!
+              <p className="text-xs sm:text-sm text-foreground font-medium">
+                You cleared Level {serverExistingScore.completedLevels}. Continue Level {Number(serverExistingScore.completedLevels) + 1} to reach up to 50 total points!
               </p>
               <Button
                 onClick={handleContinueNextLevel}
                 className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm py-2.5 px-6 rounded-xl cursor-pointer"
               >
-                Continue to Level {Number(serverExistingScore.completedLevels) + 1} ({LEVELS[Number(serverExistingScore.completedLevels)].name}) 🌺 (+{Number(serverExistingScore.completedLevels) === 1 ? 15 : 20} pts) →
+                Continue Level {Number(serverExistingScore.completedLevels) + 1} ({LEVELS[Number(serverExistingScore.completedLevels)].name}) (+{Number(serverExistingScore.completedLevels) === 1 ? 15 : 20} pts) →
               </Button>
             </div>
           )}
@@ -936,7 +962,7 @@ function PuzzlePage() {
                 <span>⏱ {formatTime(totalLiveSeconds)}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 bg-[#BAE6FD] border-2 border-[#1C332E] px-3 py-1 rounded-full text-xs sm:text-sm font-extrabold text-[#1C332E]">
-                <span>🎯 Moves: {moves}</span>
+                <span>🎯 Moves: {totalLiveMoves}</span>
               </span>
             </div>
 
@@ -974,10 +1000,11 @@ function PuzzlePage() {
           {/* Sliding Puzzle Grid */}
           <div className="w-full max-w-[540px] mx-auto relative">
             <div
-              className="grid gap-1.5 sm:gap-2 w-full border-3 border-[#1C332E] rounded-2xl p-2 sm:p-3 bg-[#1C332E] shadow-[5px_5px_0px_#B82348] select-none touch-manipulation"
+              className="grid gap-1.5 sm:gap-2 w-full border-3 border-[#1C332E] rounded-2xl p-2 sm:p-3 bg-[#1C332E] shadow-[5px_5px_0px_#B82348] select-none touch-manipulation overflow-hidden"
               style={{
                 gridTemplateColumns: `repeat(${currentLevel.cols}, minmax(0, 1fr))`,
-                aspectRatio: `${currentLevel.aspectRatio}`,
+                gridTemplateRows: `repeat(${currentLevel.rows}, minmax(0, 1fr))`,
+                aspectRatio: `${currentLevel.cols} / ${currentLevel.rows}`,
               }}
             >
               {tiles.map((tileVal, idx) => {
@@ -988,10 +1015,8 @@ function PuzzlePage() {
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="w-full h-full rounded-lg sm:rounded-xl border-2 border-dashed border-white/30 bg-black/25 flex items-center justify-center"
-                    >
-                      <span className="text-[10px] text-white/20 font-mono">blank</span>
-                    </div>
+                      className="aspect-square w-full h-full rounded-lg sm:rounded-xl border-2 border-dashed border-white/20 bg-black/30 pointer-events-none select-none"
+                    />
                   );
                 }
 
@@ -1005,7 +1030,7 @@ function PuzzlePage() {
                   <button
                     key={`tile-${tileVal}`}
                     onClick={() => handleTileClick(idx)}
-                    className="relative w-full h-full rounded-lg sm:rounded-xl border-2 border-[#1C332E] cursor-pointer hover:brightness-110 active:scale-95 transition-transform overflow-hidden shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    className="relative aspect-square w-full h-full rounded-lg sm:rounded-xl border-2 border-[#1C332E] cursor-pointer hover:brightness-105 active:brightness-90 overflow-hidden shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                     style={{
                       backgroundImage: `url(${currentLevel.image})`,
                       backgroundSize: `${cols * 100}% ${rows * 100}%`,
