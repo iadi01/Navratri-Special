@@ -293,9 +293,28 @@ function PuzzlePage() {
         if (res.ok) {
           const data = await res.json();
           if (data.attempted) {
-            localStorage.setItem(SUBMITTED_CACHE_KEY, todayIST);
-            setHasAttemptedToday(true);
             setServerExistingScore(data.existingScore);
+            // Check if user is currently in the middle of continuing the next level
+            let isContinuing = false;
+            try {
+              const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+              if (savedRaw) {
+                const parsed = JSON.parse(savedRaw);
+                if (
+                  parsed &&
+                  parsed.date === todayIST &&
+                  parsed.submitted === false &&
+                  Number(parsed.level ?? 0) >= Number(data.existingScore?.completedLevels ?? 0)
+                ) {
+                  isContinuing = true;
+                }
+              }
+            } catch {}
+
+            if (!isContinuing) {
+              localStorage.setItem(SUBMITTED_CACHE_KEY, todayIST);
+              setHasAttemptedToday(true);
+            }
           }
         }
       } catch (err) {
@@ -648,6 +667,56 @@ function PuzzlePage() {
     }
   };
 
+  // User continuation: if they stopped & submitted at Level 1 or Level 2, they can continue later today!
+  const handleContinueNextLevel = () => {
+    const nextLvl = Number(serverExistingScore?.completedLevels || 1);
+    if (nextLvl >= LEVELS.length) return;
+
+    const prevTime = Number(serverExistingScore?.totalTimeSeconds || accumulatedSeconds || 0);
+    const prevMoves = Number(serverExistingScore?.totalMoves || moves || 0);
+
+    const newDone = [false, false, false];
+    for (let i = 0; i < nextLvl; i++) newDone[i] = true;
+    setDoneLevels(newDone);
+
+    setCurrentLevelIdx(nextLvl);
+    setUnlockedLevel(nextLvl);
+    setAccumulatedSeconds(prevTime);
+    setSessionElapsed(0);
+    setMoves(0);
+
+    const newTimes = [...levelTimes];
+    newTimes[nextLvl - 1] = prevTime;
+    setLevelTimes(newTimes);
+
+    const newMoves = [...levelMovesArr];
+    newMoves[nextLvl - 1] = prevMoves;
+    setLevelMovesArr(newMoves);
+
+    const targetCols = LEVELS[nextLvl].cols;
+    const targetRows = LEVELS[nextLvl].rows;
+    const nextTiles = generateSolvableTiles(targetCols, targetRows);
+    setTiles(nextTiles);
+
+    try {
+      localStorage.removeItem(SUBMITTED_CACHE_KEY);
+    } catch {}
+
+    saveStateToStorage({
+      level: nextLvl,
+      unlocked: nextLvl,
+      tiles: nextTiles,
+      moves: 0,
+      accumulatedSeconds: prevTime,
+      done: newDone,
+      levelTimeSeconds: newTimes,
+      levelMoves: newMoves,
+      submitted: false,
+    });
+
+    setIsGameActive(false);
+    setHasAttemptedToday(false);
+  };
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 max-w-4xl mx-auto space-y-6">
@@ -788,6 +857,26 @@ function PuzzlePage() {
                   {serverExistingScore.totalMoves || 0}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* 🌺 Continue Next Level Option for Partial Completion */}
+          {serverExistingScore && Number(serverExistingScore.completedLevels || 0) < 3 && (
+            <div className="bg-emerald-50 border-2.5 border-[#1C332E] rounded-2xl p-4 sm:p-5 max-w-lg mx-auto space-y-2.5 text-center shadow-[4px_4px_0px_#1C332E]">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                <span>⚡</span> Partial Completion Saved · Aage Khelne Ka Option Khula Hai!
+              </div>
+              <p className="text-xs sm:text-sm text-emerald-950 font-medium leading-relaxed">
+                Aapne Level {serverExistingScore.completedLevels} submit karke{' '}
+                <strong className="text-pink-700">+{serverExistingScore.pointsEarned ?? (Number(serverExistingScore.completedLevels) === 1 ? 15 : 30)} PTS</strong> secure kar liye hain.
+                Agar aapka mann kare, toh aap yahin se Level {Number(serverExistingScore.completedLevels) + 1} ({LEVELS[Number(serverExistingScore.completedLevels)].name}) continue karke maximum <strong>50 points</strong> tak earn kar sakte hain!
+              </p>
+              <Button
+                onClick={handleContinueNextLevel}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm py-2.5 px-6 rounded-xl cursor-pointer"
+              >
+                Continue to Level {Number(serverExistingScore.completedLevels) + 1} ({LEVELS[Number(serverExistingScore.completedLevels)].name}) 🌺 (+{Number(serverExistingScore.completedLevels) === 1 ? 15 : 20} pts) →
+              </Button>
             </div>
           )}
 
@@ -1158,8 +1247,8 @@ function PuzzlePage() {
 
       {/* 🌟 LEVEL COMPLETE / PROCEED MODAL */}
       {showLevelModal && completedLevelInfo && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border-4 border-[#1C332E] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-[8px_8px_0px_#B82348] text-center space-y-4 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white border-4 border-[#1C332E] rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-[8px_8px_0px_#B82348] text-center space-y-3.5 my-auto max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="text-4xl animate-bounce">
               {completedLevelInfo.isLast ? '🏆🎉🏆' : '🎉✨🎉'}
             </div>
@@ -1218,12 +1307,12 @@ function PuzzlePage() {
               )}
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+            <div className="flex flex-col gap-2 pt-1 w-full">
               {!completedLevelInfo.isLast ? (
                 <>
                   <Button
                     onClick={() => proceedToNextLevel(completedLevelInfo.level + 1)}
-                    className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm cursor-pointer"
+                    className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] text-xs sm:text-sm py-2.5 px-3 rounded-xl cursor-pointer"
                   >
                     Yes, Play {LEVELS[completedLevelInfo.level + 1].name}! 🌺 (+{completedLevelInfo.level === 0 ? 15 : 20} pts)
                   </Button>
@@ -1233,7 +1322,7 @@ function PuzzlePage() {
                       setShowLevelModal(false);
                       submitPuzzleScore(completedLevelInfo.level + 1);
                     }}
-                    className="w-full sm:w-auto border-2 border-[#1C332E] font-bold text-xs hover:bg-amber-50 cursor-pointer"
+                    className="w-full border-2 border-[#1C332E] font-bold text-xs py-2 px-3 rounded-xl hover:bg-amber-50 cursor-pointer text-muted-foreground hover:text-foreground"
                   >
                     Stop & Submit ({completedLevelInfo.level === 0 ? '15 Points' : '30 Points'}) ✓
                   </Button>
@@ -1244,7 +1333,7 @@ function PuzzlePage() {
                     setShowLevelModal(false);
                     setShowShareModal(true);
                   }}
-                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] rounded-xl cursor-pointer flex items-center justify-center gap-2 py-3"
                 >
                   <Share2 size={16} /> Share 4:5 Card on BeSocial! 🌟
                 </Button>

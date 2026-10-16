@@ -981,19 +981,24 @@ export async function checkPuzzleAttemptInMongo(
 
     if (existing) {
       const calcPoints = (lvls: number) => (lvls >= 3 ? 50 : lvls === 2 ? 30 : lvls === 1 ? 15 : 0);
+      const completedLevels = Number(existing.completedLevels || 0);
+      const canContinue = completedLevels < 3;
       return {
         attempted: true,
-        reason: `Participant "${existing.fullName || existing.username}" has already completed today's Navratri puzzle challenge.`,
+        canContinue,
+        reason: canContinue
+          ? `Participant "${existing.fullName || existing.username}" completed Level ${completedLevels}. You can continue to next levels!`
+          : `Participant "${existing.fullName || existing.username}" has already completed all 3 levels of today's Navratri puzzle challenge.`,
         existingScore: {
           id: existing.id,
           username: existing.username,
           fullName: existing.fullName,
           course: existing.course,
           rollNo: existing.rollNo,
-          completedLevels: existing.completedLevels,
+          completedLevels,
           totalTimeSeconds: existing.totalTimeSeconds,
           totalMoves: existing.totalMoves,
-          pointsEarned: existing.pointsEarned ?? calcPoints(existing.completedLevels || 0),
+          pointsEarned: existing.pointsEarned ?? calcPoints(completedLevels),
           bonusAwarded: existing.bonusAwarded,
           bonusPoints: existing.bonusPoints,
           submittedAt: existing.submittedAt,
@@ -1044,13 +1049,27 @@ export async function savePuzzleScoreToMongo(
     const cleanBatch = (submission.batch || '').trim();
     const cleanEmail = (submission.email || '').trim();
 
-    // 2. Anti-cheat check: strictly 1 attempt per day per student
+    // 2. Anti-cheat check: strictly 1 daily session per student, with continuation allowed for partial levels (Level 1 -> 2 -> 3)
     const checkAttempt = await checkPuzzleAttemptInMongo(cleanUsername, cleanRollNo, targetDate);
-    if (checkAttempt.attempted) {
-      return {
-        success: false,
-        error: checkAttempt.reason || 'You have already submitted your puzzle attempt for today. Only 1 attempt per day is allowed!',
-      };
+    const existing = checkAttempt.existingScore;
+    const currentLevels = Number(submission.completedLevels);
+    const currentTime = Number(submission.totalTimeSeconds);
+    const currentMoves = Number(submission.totalMoves);
+
+    if (checkAttempt.attempted && existing) {
+      const prevLevels = Number(existing.completedLevels || 0);
+      if (prevLevels >= 3) {
+        return {
+          success: false,
+          error: 'You have already completed all 3 levels of today\'s puzzle challenge! (Maximum 50 points earned)',
+        };
+      }
+      if (currentLevels <= prevLevels) {
+        return {
+          success: false,
+          error: `You have already recorded Level ${prevLevels} (${existing.pointsEarned ?? 15} points). You can only continue and submit higher levels!`,
+        };
+      }
     }
 
     // 3. Calculate rank for today's submissions
@@ -1058,10 +1077,6 @@ export async function savePuzzleScoreToMongo(
       .find({ date: targetDate })
       .sort({ completedLevels: -1, totalTimeSeconds: 1, totalMoves: 1, createdAt: 1 })
       .toArray();
-
-    const currentLevels = Number(submission.completedLevels);
-    const currentTime = Number(submission.totalTimeSeconds);
-    const currentMoves = Number(submission.totalMoves);
 
     let rank = 1;
     for (const e of todayEntries) {
@@ -1089,29 +1104,56 @@ export async function savePuzzleScoreToMongo(
     const entryId = submission.id || `puzzle-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date();
 
-    // 4. Save puzzle score separately in puzzle_scores collection
-    await puzzleScoresCol.insertOne({
-      id: entryId,
-      username: cleanUsername,
-      fullName: cleanFullName,
-      course: cleanCourse,
-      year: cleanYear,
-      batch: cleanBatch,
-      rollNo: cleanRollNo,
-      email: cleanEmail,
-      date: targetDate,
-      completedLevels: currentLevels,
-      totalTimeSeconds: currentTime,
-      totalMoves: currentMoves,
-      pointsEarned,
-      levelBreakdown: submission.levelBreakdown || [],
-      bonusAwarded: false, // Strict: No points added to general leaderboard
-      bonusPoints: 0,
-      rank,
-      clientIp: clientIp || submission.clientIp || '',
-      submittedAt: submission.submittedAt || now.toISOString(),
-      createdAt: now,
-    });
+    // 4. Save or update puzzle score in puzzle_scores collection
+    if (existing) {
+      const updateConditions: any[] = [];
+      if (cleanRollNo) updateConditions.push({ rollNo: cleanRollNo });
+      if (cleanUsername) {
+        const esc = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        updateConditions.push({ username: { $regex: new RegExp(`^${esc}$`, 'i') } });
+        updateConditions.push({ fullName: { $regex: new RegExp(`^${esc}$`, 'i') } });
+      }
+
+      await puzzleScoresCol.updateOne(
+        { date: targetDate, $or: updateConditions },
+        {
+          $set: {
+            completedLevels: currentLevels,
+            totalTimeSeconds: currentTime,
+            totalMoves: currentMoves,
+            pointsEarned,
+            levelBreakdown: submission.levelBreakdown || [],
+            rank,
+            clientIp: clientIp || submission.clientIp || '',
+            submittedAt: submission.submittedAt || now.toISOString(),
+            updatedAt: now,
+          },
+        }
+      );
+    } else {
+      await puzzleScoresCol.insertOne({
+        id: entryId,
+        username: cleanUsername,
+        fullName: cleanFullName,
+        course: cleanCourse,
+        year: cleanYear,
+        batch: cleanBatch,
+        rollNo: cleanRollNo,
+        email: cleanEmail,
+        date: targetDate,
+        completedLevels: currentLevels,
+        totalTimeSeconds: currentTime,
+        totalMoves: currentMoves,
+        pointsEarned,
+        levelBreakdown: submission.levelBreakdown || [],
+        bonusAwarded: false, // Strict: No points added to general leaderboard
+        bonusPoints: 0,
+        rank,
+        clientIp: clientIp || submission.clientIp || '',
+        submittedAt: submission.submittedAt || now.toISOString(),
+        createdAt: now,
+      });
+    }
 
     // 5. Update users collection profile (only academic identity info, no quiz marks added)
     const usersCol = db.collection('users');

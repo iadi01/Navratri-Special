@@ -60,8 +60,8 @@ export function PuzzleShareModal({
       ? '/navratri-puzzle-art-1.jpg'
       : '/navratri-puzzle-art-0.jpg');
 
-  // Exact user-requested caption format
-  const shareCaption = `🧩 I completed the Navratri Sliding Puzzle in ${totalTimeSeconds}s with ${totalMoves} moves and earned ${pointsEarned} points, including 50+ bonus points! 🏆🌸\n\nPart of “Navshakti: The Unsung Heroines of India” series.\n\nThink you can solve it faster with fewer moves? Play now and beat my score!\n\n🔗 ${websiteUrl}`;
+  // Share caption matching the leaderboard format cleanly
+  const shareCaption = `🏆 I scored ${pointsEarned} points (Level ${completedLevels}/3) in the Navratri Sliding Puzzle of "पहचानो कौन?" in ${totalTimeSeconds}s with ${totalMoves} moves${rank ? ` (Rank #${rank})` : ''}! 🌸\n\nCan you solve it faster with fewer moves? Test your speed on the festive puzzle: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
 
   // Draw 4:5 High-Resolution Scorecard Canvas (1080 x 1350)
   const drawCard = () => {
@@ -148,42 +148,57 @@ export function PuzzleShareModal({
     const studentInfo = `👤 ${fullName || 'Pehchaan Kaun Player'}  |  ${course} · ${year}${rollPart}`;
     ctx.fillText(studentInfo, width / 2, pillY + 41);
 
-    // 6. Solved Artwork Image Container
-    const artBoxW = 760;
-    const artBoxH = 430;
-    const artBoxX = (width - artBoxW) / 2;
-    const artBoxY = 355;
+    // 6. Solved Artwork Image Container (Natural Aspect Ratio Preserving - Zero Compression)
+    const artBoxMaxW = 860;
+    const artBoxMaxH = 440;
+    const artBoxAreaY = 350;
 
     // Load and draw the solved puzzle artwork
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Artwork background shadow
+      const natW = img.naturalWidth || img.width || 1;
+      const natH = img.naturalHeight || img.height || 1;
+      const imgRatio = natW / natH;
+
+      // Fit inside artBoxMaxW x artBoxMaxH while strictly preserving natural aspect ratio
+      let drawW = artBoxMaxW;
+      let drawH = drawW / imgRatio;
+
+      if (drawH > artBoxMaxH) {
+        drawH = artBoxMaxH;
+        drawW = drawH * imgRatio;
+      }
+
+      const drawX = (width - drawW) / 2;
+      const drawY = artBoxAreaY + (artBoxMaxH - drawH) / 2;
+
+      // Artwork background drop shadow
       ctx.fillStyle = '#1C332E';
       ctx.beginPath();
-      ctx.roundRect(artBoxX + 6, artBoxY + 6, artBoxW, artBoxH, 20);
+      ctx.roundRect(drawX + 8, drawY + 8, drawW, drawH, 20);
       ctx.fill();
 
       // Artwork frame
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(artBoxX, artBoxY, artBoxW, artBoxH, 20);
+      ctx.roundRect(drawX, drawY, drawW, drawH, 20);
       ctx.clip();
-      ctx.drawImage(img, artBoxX, artBoxY, artBoxW, artBoxH);
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
       ctx.restore();
 
       // Artwork border
       ctx.strokeStyle = '#1C332E';
       ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.roundRect(artBoxX, artBoxY, artBoxW, artBoxH, 20);
+      ctx.roundRect(drawX, drawY, drawW, drawH, 20);
       ctx.stroke();
 
       // Top corner badge on Artwork
       const badgeW = 260;
       const badgeH = 44;
-      const badgeX = artBoxX + artBoxW - badgeW - 16;
-      const badgeY = artBoxY + 16;
+      const badgeX = drawX + drawW - badgeW - 14;
+      const badgeY = drawY + 14;
 
       ctx.fillStyle = '#B82348';
       ctx.strokeStyle = '#FFFFFF';
@@ -209,14 +224,19 @@ export function PuzzleShareModal({
 
     img.onerror = () => {
       // Fallback if image fails to load
+      const fallbackW = 760;
+      const fallbackH = 430;
+      const fallbackX = (width - fallbackW) / 2;
+      const fallbackY = 355;
+
       ctx.fillStyle = '#1C332E';
       ctx.beginPath();
-      ctx.roundRect(artBoxX, artBoxY, artBoxW, artBoxH, 20);
+      ctx.roundRect(fallbackX, fallbackY, fallbackW, fallbackH, 20);
       ctx.fill();
 
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '800 32px "Baloo 2", sans-serif';
-      ctx.fillText('🌸 NAVRATRI PUZZLE SOLVED! 🌸', width / 2, artBoxY + 220);
+      ctx.fillText('🌸 NAVRATRI PUZZLE SOLVED! 🌸', width / 2, fallbackY + 220);
 
       drawBottomSection();
     };
@@ -498,6 +518,19 @@ export function PuzzleShareModal({
           </div>
         )}
 
+        {/* Quick Instructions like leaderboard modal */}
+        <div className="bg-amber-50/70 border border-[#1C332E]/30 rounded-xl p-2.5 text-[11px] text-muted-foreground space-y-1 shrink-0 text-left">
+          <p className="font-bold text-foreground">
+            How to post on BeSocial:
+          </p>
+          <p>
+            1. Click <strong>"Share on BeSocial"</strong> below — 4:5 scorecard image downloads &amp; BeSocial opens.
+          </p>
+          <p>
+            2. Simply attach the downloaded scorecard image in your BeSocial post!
+          </p>
+        </div>
+
         {/* Action 1: One-Click BeSocial Share */}
         <Button
           size="lg"
@@ -505,7 +538,8 @@ export function PuzzleShareModal({
           className="w-full bg-pink-600 hover:bg-pink-700 text-white font-extrabold text-sm sm:text-base py-3 rounded-2xl border-3 border-[#1C332E] shadow-[4px_4px_0px_#1C332E] hover:shadow-[2px_2px_0px_#1C332E] transition-all cursor-pointer flex items-center justify-center gap-2"
         >
           <Share2 size={18} />
-          <span>Share on BeSocial (Auto-Download & Open)</span>
+          <span>Share on BeSocial (1-Click)</span>
+          <span className="hidden sm:inline text-xs opacity-90">(Auto-Download &amp; Open)</span>
           <ExternalLink size={15} />
         </Button>
 
@@ -514,12 +548,21 @@ export function PuzzleShareModal({
           <Button
             variant="outline"
             size="sm"
+            onClick={downloadCardImage}
+            className="border-2 border-[#1C332E] font-bold text-xs h-10 hover:bg-amber-50 rounded-xl cursor-pointer"
+          >
+            <Download size={14} className="mr-1 text-amber-600" /> Download Card
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={copyTextCaption}
-            className="border-2 border-[#1C332E] font-bold text-xs h-10 hover:bg-pink-50"
+            className="border-2 border-[#1C332E] font-bold text-xs h-10 hover:bg-pink-50 rounded-xl cursor-pointer"
           >
             {copiedText ? (
               <>
-                <Check size={14} className="mr-1 text-emerald-600" /> Copied!
+                <Check size={14} className="mr-1 text-emerald-600" /> Caption Copied!
               </>
             ) : (
               <>
@@ -527,34 +570,6 @@ export function PuzzleShareModal({
               </>
             )}
           </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={downloadCardImage}
-            className="border-2 border-[#1C332E] font-bold text-xs h-10 hover:bg-amber-50"
-          >
-            <Download size={14} className="mr-1 text-amber-600" /> Download Card
-          </Button>
-        </div>
-
-        {/* Caption Preview Box */}
-        <div className="bg-muted/40 border-2 border-border/80 rounded-2xl p-3 space-y-1.5 text-left">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              BeSocial Post Caption:
-            </span>
-            <button
-              onClick={copyTextCaption}
-              className="text-[11px] font-bold text-pink-600 hover:underline flex items-center gap-1"
-            >
-              {copiedText ? <Check size={12} /> : <Copy size={12} />}
-              {copiedText ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <p className="text-xs font-mono text-foreground whitespace-pre-line bg-white/70 p-2.5 rounded-lg border border-border/60 max-h-24 overflow-y-auto">
-            {shareCaption}
-          </p>
         </div>
       </div>
     </div>
