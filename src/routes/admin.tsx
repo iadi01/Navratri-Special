@@ -66,6 +66,42 @@ export const Route = createFileRoute('/admin')({
   component: AdminPage,
 });
 
+const ADMIN_PUZZLE_LEVELS = [
+  {
+    name: 'Easy',
+    level: 0,
+    cols: 3,
+    rows: 3,
+    totalTiles: 9,
+    art: '🪔',
+    desc: 'Level 1: 3×3 Grid · Maa Durga ki jyoti — light the way!',
+    image: '/navratri-puzzle-art-0.jpg',
+    aspectRatio: '1 / 1',
+  },
+  {
+    name: 'Medium',
+    level: 1,
+    cols: 4,
+    rows: 3,
+    totalTiles: 12,
+    art: '🌺',
+    desc: 'Level 2: 4×3 Grid · Divine Navratri celebration.',
+    image: '/navratri-puzzle-art-1.jpg',
+    aspectRatio: '4 / 3',
+  },
+  {
+    name: 'Hard',
+    level: 2,
+    cols: 6,
+    rows: 3,
+    totalTiles: 18,
+    art: '💃',
+    desc: 'Level 3: 6×3 Grid · Dandiya night celebration!',
+    image: '/navratri-puzzle-art-2.jpg',
+    aspectRatio: '6 / 3',
+  },
+];
+
 function AdminPage() {
   const navigate = useNavigate();
   const [session, setSession] = useState<{ isAuthenticated: boolean; user: AdminUser | null }>({
@@ -134,6 +170,8 @@ function AdminPage() {
   const [puzzleSubmissions, setPuzzleSubmissions] = useState<any[]>([]);
   const [showPuzzleSubmissions, setShowPuzzleSubmissions] = useState<boolean>(false);
   const [isLoadingPuzzleSubmissions, setIsLoadingPuzzleSubmissions] = useState<boolean>(false);
+  const [showPuzzleInspector, setShowPuzzleInspector] = useState<boolean>(false);
+  const [showGridOverlayOnArtwork, setShowGridOverlayOnArtwork] = useState<boolean>(false);
 
   const loadPuzzleSubmissions = async () => {
     setIsLoadingPuzzleSubmissions(true);
@@ -619,6 +657,18 @@ function AdminPage() {
                     Open Puzzle Page <ArrowRight size={12} className="ml-1" />
                   </Link>
                 </Button>
+
+                {isMainAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowPuzzleInspector(!showPuzzleInspector)}
+                    className="border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold text-xs"
+                  >
+                    <Crown size={13} className="mr-1.5 text-amber-500" />
+                    {showPuzzleInspector ? 'Hide Full Puzzle' : '👁️ View Full Puzzle (Main Admin Only)'}
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -713,6 +763,113 @@ function AdminPage() {
                     </table>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 👑 MAIN ADMIN ONLY: FULL PUZZLE INSPECTOR & ARTWORK GALLERY */}
+            {isMainAdmin && showPuzzleInspector && (
+              <div className="mt-4 pt-4 border-t border-amber-500/30 space-y-4 animate-in fade-in-50 duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                  <div className="flex items-center gap-2">
+                    <Crown size={20} className="text-amber-500 shrink-0" />
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-extrabold text-foreground flex items-center gap-1.5">
+                        Full Puzzle Artwork & Solution Inspector
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold">
+                          MAIN ADMIN ONLY
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground">
+                        Complete target artwork solutions for all 3 levels. Regular students cannot view target artwork while playing.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowGridOverlayOnArtwork(!showGridOverlayOnArtwork)}
+                    className="text-xs font-bold h-7 border-amber-500/40 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 shrink-0"
+                  >
+                    <Layers size={13} className="mr-1" />
+                    {showGridOverlayOnArtwork ? 'Hide Grid Cuts' : 'Show Grid Cuts Overlay'}
+                  </Button>
+                </div>
+
+                {/* 3 Level Grid Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {ADMIN_PUZZLE_LEVELS.map((lv) => (
+                    <div
+                      key={lv.name}
+                      className="bg-card border-2 border-border/80 hover:border-amber-500/50 rounded-2xl p-3.5 space-y-3 shadow-sm transition-all flex flex-col"
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <div>
+                          <span className="text-xl mr-1">{lv.art}</span>
+                          <span className="font-extrabold text-sm text-foreground">
+                            Level {lv.level + 1}: {lv.name}
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground font-mono">
+                            {lv.cols}×{lv.rows} Grid ({lv.totalTiles - 1} tiles + 1 blank)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted font-bold text-muted-foreground">
+                          Ratio {lv.aspectRatio}
+                        </span>
+                      </div>
+
+                      <div
+                        className="relative w-full rounded-xl overflow-hidden border-2 border-[#1C332E] bg-black/5 shadow-inner"
+                        style={{ aspectRatio: lv.aspectRatio }}
+                      >
+                        <img
+                          src={lv.image}
+                          alt={lv.name}
+                          className="w-full h-full object-cover select-none"
+                        />
+                        {showGridOverlayOnArtwork && (
+                          <div
+                            className="absolute inset-0 grid pointer-events-none"
+                            style={{
+                              gridTemplateColumns: `repeat(${lv.cols}, minmax(0, 1fr))`,
+                              gridTemplateRows: `repeat(${lv.rows}, minmax(0, 1fr))`,
+                            }}
+                          >
+                            {[...Array(lv.cols * lv.rows)].map((_, i) => (
+                              <div
+                                key={i}
+                                className="border border-white/60 bg-black/10 flex items-center justify-center"
+                              >
+                                <span className="text-[9px] font-mono font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                                  {i + 1 === lv.cols * lv.rows ? 'BLANK' : i + 1}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground line-clamp-2">
+                        {lv.desc}
+                      </p>
+
+                      <div className="pt-2 mt-auto flex items-center justify-between gap-2 border-t border-border/50">
+                        <a
+                          href={lv.image}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-bold text-pink-600 hover:underline flex items-center gap-1"
+                        >
+                          <Eye size={12} /> Full Image ↗
+                        </a>
+                        <Button size="sm" variant="outline" className="text-[11px] h-7 px-2.5 font-bold" asChild>
+                          <Link to="/puzzle">
+                            Test on /puzzle <ArrowRight size={11} className="ml-1" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
