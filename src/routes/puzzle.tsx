@@ -1018,7 +1018,7 @@ function PuzzlePage() {
                   onClick={() => {
                     const completedCount = doneLevels.filter(Boolean).length;
                     const pts = completedCount >= 2 ? 30 : 15;
-                    if (window.confirm(`Kya aap game yahin stop karke apna ${pts} points ka score submit karna chahte hain?`)) {
+                    if (window.confirm(`Stop and submit your score with ${pts} points now?`)) {
                       submitPuzzleScore(completedCount);
                     }
                   }}
@@ -1332,7 +1332,7 @@ function PuzzlePage() {
               </span>
               <h3 className="text-2xl sm:text-3xl font-extrabold text-[#1C332E] font-['Baloo_2']">
                 {completedLevelInfo.isLast
-                  ? 'Sab Levels Complete! 🏆'
+                  ? 'All Levels Complete! 🏆'
                   : `${LEVELS[completedLevelInfo.level].name} Complete! 🎉`}
               </h3>
             </div>
@@ -1358,19 +1358,19 @@ function PuzzlePage() {
 
             <p className="text-xs sm:text-sm text-muted-foreground">
               {completedLevelInfo.isLast ? (
-                <>Tumne poora puzzle master kar liya aur maximum <strong>50 points</strong> earn kar liye — Shubh Navratri! 🌸</>
+                <>You mastered all 3 levels and earned <strong className="text-foreground">50 points</strong> — Shubh Navratri! 🌸</>
               ) : completedLevelInfo.level === 0 ? (
                 <>
-                  Tumne Level 1 complete karke <strong className="text-foreground">15 Points</strong> earn kar liye!
+                  Cleared Level 1 for <strong className="text-foreground">15 Points</strong>.
                   <span className="block mt-1 font-bold text-[#1C332E]">
-                    Kya Medium level khelna chahte ho (+15 pts)? Ya yahin 15 points submit karke score record karna hai?
+                    Play Medium (+15 pts) or submit now with 15 points?
                   </span>
                 </>
               ) : (
                 <>
-                  Tumne Level 2 complete karke <strong className="text-foreground">30 Points</strong> earn kar liye!
+                  Cleared Level 2 for <strong className="text-foreground">30 Points</strong>.
                   <span className="block mt-1 font-bold text-[#1C332E]">
-                    Kya Hard level khelna chahte ho (+20 pts)? Ya yahin 30 points submit karke score record karna hai?
+                    Play Hard (+20 pts) or submit now with 30 points?
                   </span>
                 </>
               )}
