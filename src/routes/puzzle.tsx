@@ -1446,18 +1446,6 @@ function PuzzlePage() {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">
-                  Enrollment / Roll No <span className="text-muted-foreground font-normal">(Recommended)</span>
-                </label>
-                <Input
-                  placeholder="e.g. A2305221001"
-                  value={rollNoInput}
-                  onChange={(e) => setRollNoInput(e.target.value)}
-                  className="border-2 border-[#1C332E] font-mono font-medium"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-foreground block mb-1">Course</label>
