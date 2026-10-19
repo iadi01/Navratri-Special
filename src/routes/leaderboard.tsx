@@ -18,7 +18,6 @@ import {
   Share2,
   Sparkles,
   Lock,
-  Unlock,
   Flower2,
 } from 'lucide-react';
 import { ShareCardModal } from '@/components/share-card-modal';
@@ -39,7 +38,6 @@ import {
   syncLiveDaysWithServer,
   getLeaderboardConfig,
   syncLeaderboardConfigWithServer,
-  getAdminSession,
   type LeaderboardConfig,
 } from '@/lib/admin-store';
 
@@ -153,9 +151,7 @@ function Leaderboard() {
   const search = useSearch({ from: '/leaderboard' });
   const [liveDays, setLiveDays] = useState<number[]>(() => getLiveDays());
 
-  // Admin & Suspense Config State
-  const [adminSession, setAdminSession] = useState<{ isAuthenticated: boolean }>(() => getAdminSession());
-  const [adminPreviewPublic, setAdminPreviewPublic] = useState<boolean>(false);
+  // Leaderboard Suspense Config State
   const [leaderboardConfig, setLeaderboardConfig] = useState<LeaderboardConfig>(() => getLeaderboardConfig());
 
   const [activeTab, setActiveTab] = useState<'overall' | 'daily'>(
@@ -274,15 +270,12 @@ function Leaderboard() {
     syncLeaderboardConfigWithServer().then(cfg => {
       setLeaderboardConfig(cfg);
     });
-    const s = getAdminSession();
-    setAdminSession(s);
-    syncLeaderboardWithServer(s.isAuthenticated).then(() => {
+    syncLeaderboardWithServer().then(() => {
       loadData(getLiveDays());
     });
     const handleUpdate = () => {
       const days = getLiveDays();
       setLiveDays(days);
-      setAdminSession(getAdminSession());
       setLeaderboardConfig(getLeaderboardConfig());
     };
     window.addEventListener('pehchaan_leaderboard_updated', handleUpdate);
@@ -295,12 +288,8 @@ function Leaderboard() {
     };
   }, []);
 
-  // Whether current view is in suspense for this user
+  // Whether current view is in suspense
   const isSuspenseActive = useMemo(() => {
-    // If admin is viewing and has NOT explicitly chosen to preview public view: show real standings
-    if (adminSession.isAuthenticated && !adminPreviewPublic) {
-      return false;
-    }
     // Suspense must be enabled in config
     if (!leaderboardConfig.suspenseEnabled) {
       return false;
@@ -316,7 +305,7 @@ function Leaderboard() {
       const latestLive = openDays[openDays.length - 1] || 1;
       return latestLive >= hideDay;
     }
-  }, [adminSession, adminPreviewPublic, leaderboardConfig, activeTab, selectedDay, openDays]);
+  }, [leaderboardConfig, activeTab, selectedDay, openDays]);
 
   const filteredOverall = useMemo(() => {
     if (!searchQuery.trim()) return overallList;
@@ -372,41 +361,6 @@ function Leaderboard() {
 
   return (
     <main className="wrap section pb-16">
-      {/* 👑 ADMIN NOTICE BANNER */}
-      {adminSession.isAuthenticated && (
-        <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-500/15 border-2 border-amber-600 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5 text-xs font-bold text-amber-950 dark:text-amber-200">
-            <Crown size={20} className="text-amber-600 shrink-0" />
-            <span>
-              <strong>Admin Mode Active:</strong> You are viewing authentic student standings. Public visitors currently see the <b>“Stay Tuned”</b> suspense announcement for Day {leaderboardConfig.hideFromDay}+ and Overall.
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setAdminPreviewPublic(!adminPreviewPublic)}
-              className="text-xs font-extrabold h-8.5 border-amber-600 bg-white hover:bg-amber-100 text-amber-950 cursor-pointer shadow-xs"
-            >
-              {adminPreviewPublic ? (
-                <>
-                  <Unlock size={13} className="mr-1.5 text-emerald-600" /> View Admin Leaderboard
-                </>
-              ) : (
-                <>
-                  <Lock size={13} className="mr-1.5 text-amber-600" /> Preview Public Suspense
-                </>
-              )}
-            </Button>
-            <Button size="sm" asChild variant="ghost" className="text-xs h-8.5 text-amber-900 hover:text-amber-950">
-              <Link to="/admin">
-                Admin Panel <ArrowRight size={12} className="ml-1" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="text-center max-w-2xl mx-auto mb-8">
         <div className="eyebrow mb-2">
@@ -807,7 +761,7 @@ function Leaderboard() {
               const isSelected = selectedDay === quiz.day;
               const isLive = liveDays.includes(quiz.day);
               const hideDay = typeof leaderboardConfig.hideFromDay === 'number' ? leaderboardConfig.hideFromDay : 8;
-              const isLockedSuspense = leaderboardConfig.suspenseEnabled && quiz.day >= hideDay && (!adminSession.isAuthenticated || adminPreviewPublic);
+              const isLockedSuspense = leaderboardConfig.suspenseEnabled && quiz.day >= hideDay;
               return (
                 <Button
                   key={quiz.day}
