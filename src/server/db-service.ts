@@ -327,12 +327,24 @@ export async function checkUsernameConflictInMongo(params: {
   }
 }
 
-export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry[]> {
+export async function getScoresFromMongo(day?: number, isAdmin: boolean = false): Promise<LeaderboardEntry[]> {
   try {
     const { db, status } = await connectToDatabase();
     if (!db || !status.connected) {
       return [];
     }
+
+    // 🔒 Enforce Day 8+ leaderboard suspense on backend for public callers:
+    if (!isAdmin) {
+      const config = await getLeaderboardConfigFromMongo();
+      if (config.suspenseEnabled && typeof config.hideFromDay === 'number') {
+        if (day && day >= config.hideFromDay) {
+          // Public request for a day in suspense: return empty array
+          return [];
+        }
+      }
+    }
+
     const collection = db.collection('leaderboard');
     const query = day ? { day: Number(day) } : {};
 
@@ -394,7 +406,7 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       return new Date(a.submittedAt || a.createdAt).getTime() - new Date(b.submittedAt || b.createdAt).getTime();
     });
 
-    return uniqueFirstAttempts.map(r => ({
+    let mapped = uniqueFirstAttempts.map(r => ({
       id: r.id || r._id.toString(),
       username: r.username,
       fullName: r.fullName || r.username,
@@ -412,6 +424,16 @@ export async function getScoresFromMongo(day?: number): Promise<LeaderboardEntry
       clientIp: r.clientIp || '',
       answers: Array.isArray(r.answers) ? r.answers : undefined,
     }));
+
+    // If caller is public (non-admin) and suspense is enabled, redact Day >= hideFromDay in overall view as well
+    if (!isAdmin) {
+      const config = await getLeaderboardConfigFromMongo();
+      if (config.suspenseEnabled && typeof config.hideFromDay === 'number') {
+        mapped = mapped.filter(e => e.day < config.hideFromDay);
+      }
+    }
+
+    return mapped;
   } catch (err: any) {
     console.error('Failed to get scores from MongoDB:', err?.message);
     return [];
@@ -1349,4 +1371,159 @@ export async function deletePuzzleScoreInMongo(params: {
     return { success: false, error: err?.message || 'Failed to delete puzzle score from database.' };
   }
 }
+
+// =========================================================================
+// 🔒 LEADERBOARD CONFIGURATION & DAY 8+ SUSPENSE CONTROLS
+// =========================================================================
+
+export type LeaderboardConfig = {
+  hideFromDay: number;
+  suspenseEnabled: boolean;
+  announcementMessage?: string;
+  updatedAt?: string;
+};
+
+export async function getLeaderboardConfigFromMongo(): Promise<LeaderboardConfig> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return {
+        hideFromDay: 8,
+        suspenseEnabled: true,
+        announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+      };
+    }
+
+    const configCol = db.collection('config');
+    const doc = await configCol.findOne({ key: 'leaderboard_config' });
+    if (doc) {
+      return {
+        hideFromDay: typeof doc.hideFromDay === 'number' ? doc.hideFromDay : 8,
+        suspenseEnabled: doc.suspenseEnabled !== false,
+        announcementMessage: doc.announcementMessage || 'The celebration is not over yet. Stay tuned for the final reveal!',
+        updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
+      };
+    }
+    return {
+      hideFromDay: 8,
+      suspenseEnabled: true,
+      announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+    };
+  } catch (err) {
+    return {
+      hideFromDay: 8,
+      suspenseEnabled: true,
+      announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+    };
+  }
+}
+
+export async function saveLeaderboardConfigToMongo(config: Partial<LeaderboardConfig>): Promise<boolean> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return false;
+    }
+
+    const configCol = db.collection('config');
+    const updateDoc: any = {
+      key: 'leaderboard_config',
+      updatedAt: new Date(),
+    };
+    if (typeof config.hideFromDay === 'number') updateDoc.hideFromDay = config.hideFromDay;
+    if (typeof config.suspenseEnabled === 'boolean') updateDoc.suspenseEnabled = config.suspenseEnabled;
+    if (config.announcementMessage) updateDoc.announcementMessage = config.announcementMessage;
+
+    await configCol.updateOne(
+      { key: 'leaderboard_config' },
+      { $set: updateDoc },
+      { upsert: true }
+    );
+    return true;
+  } catch (err) {
+    console.error('Failed to save leaderboard config to MongoDB:', err);
+    return false;
+  }
+}
+
+// =========================================================================
+// 🌸 SHAKTI REFLECTION: WHAT DID YOU LEARN?
+// =========================================================================
+
+export type ShaktiReflectionRecord = {
+  id?: string;
+  quality: string;
+  reflectionText: string;
+  authorName?: string;
+  course?: string;
+  year?: string;
+  rollNo?: string;
+  clientIp?: string;
+  createdAt?: string | Date;
+  isPublic?: boolean;
+};
+
+export async function saveReflectionToMongo(
+  record: ShaktiReflectionRecord,
+  clientIp?: string
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return { success: false, error: 'Database not connected' };
+    }
+
+    const reflectionsCol = db.collection('reflections');
+    const now = new Date();
+    const entryId = record.id || `refl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    await reflectionsCol.insertOne({
+      id: entryId,
+      quality: record.quality?.trim() || 'Courage',
+      reflectionText: record.reflectionText?.trim() || '',
+      authorName: record.authorName?.trim() || '',
+      course: record.course?.trim() || '',
+      year: record.year?.trim() || '',
+      rollNo: (record.rollNo || '').trim().toUpperCase(),
+      clientIp: clientIp || record.clientIp || '',
+      isPublic: Boolean(record.isPublic), // default false (private by default)
+      createdAt: now,
+    });
+
+    return { success: true, id: entryId };
+  } catch (err: any) {
+    console.error('Failed to save reflection to MongoDB:', err?.message);
+    return { success: false, error: err?.message || 'Failed to save reflection.' };
+  }
+}
+
+export async function getReflectionsFromMongo(): Promise<ShaktiReflectionRecord[]> {
+  try {
+    const { db, status } = await connectToDatabase();
+    if (!db || !status.connected) {
+      return [];
+    }
+    const reflectionsCol = db.collection('reflections');
+    const docs = await reflectionsCol
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .toArray();
+
+    return docs.map(d => ({
+      id: d.id || d._id.toString(),
+      quality: d.quality,
+      reflectionText: d.reflectionText,
+      authorName: d.authorName,
+      course: d.course,
+      year: d.year,
+      rollNo: d.rollNo,
+      createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : new Date().toISOString(),
+      isPublic: d.isPublic ?? false,
+    }));
+  } catch (err) {
+    return [];
+  }
+}
+
 

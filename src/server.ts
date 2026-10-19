@@ -26,6 +26,10 @@ import {
   getPuzzleLeaderboardFromMongo,
   getPuzzleStatsFromMongo,
   deletePuzzleScoreInMongo,
+  getLeaderboardConfigFromMongo,
+  saveLeaderboardConfigToMongo,
+  saveReflectionToMongo,
+  getReflectionsFromMongo,
 } from "./server/db-service";
 
 type ServerEntry = {
@@ -169,8 +173,84 @@ export default {
         try {
           const dayParam = url.searchParams.get('day');
           const day = dayParam ? Number(dayParam) : undefined;
-          const scores = await getScoresFromMongo(day);
+          const isAdmin =
+            url.searchParams.get('admin') === 'true' ||
+            request.headers.get('x-admin-role') === 'admin' ||
+            request.headers.get('x-admin-role') === 'main_admin';
+          const scores = await getScoresFromMongo(day, isAdmin);
           return new Response(JSON.stringify(scores), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify([]), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
+    }
+
+    // 🔒 Leaderboard Config & Day 8+ Suspense Controls
+    if (url.pathname === '/api/leaderboard/config') {
+      if (request.method === 'GET') {
+        try {
+          const cfg = await getLeaderboardConfigFromMongo();
+          return new Response(JSON.stringify(cfg), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(
+            JSON.stringify({
+              hideFromDay: 8,
+              suspenseEnabled: true,
+              announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          );
+        }
+      }
+
+      if (request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const ok = await saveLeaderboardConfigToMongo(body);
+          return new Response(JSON.stringify({ success: ok }), {
+            status: ok ? 200 : 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ success: false, error: err?.message }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
+    }
+
+    // 🌸 Shakti Reflections: What Did You Learn?
+    if (url.pathname === '/api/reflections') {
+      if (request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const res = await saveReflectionToMongo(body, clientIp);
+          return new Response(JSON.stringify(res), {
+            status: res.success ? 200 : 400,
+            headers: { 'content-type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ success: false, error: err?.message }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+      }
+
+      if (request.method === 'GET') {
+        try {
+          const reflections = await getReflectionsFromMongo();
+          return new Response(JSON.stringify(reflections), {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });

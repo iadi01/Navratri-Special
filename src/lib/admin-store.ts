@@ -388,3 +388,83 @@ export async function setDayLive(day: number, shouldBeLive: boolean): Promise<nu
   }
   return result;
 }
+
+// =========================================================================
+// 🔒 LEADERBOARD VISIBILITY & SUSPENSE STORE
+// =========================================================================
+
+export type LeaderboardConfig = {
+  hideFromDay: number;
+  suspenseEnabled: boolean;
+  announcementMessage?: string;
+  updatedAt?: string;
+};
+
+const LEADERBOARD_CONFIG_KEY = 'pehchaan_leaderboard_config_v1';
+
+export const DEFAULT_LEADERBOARD_CONFIG: LeaderboardConfig = {
+  hideFromDay: 8,
+  suspenseEnabled: true,
+  announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+};
+
+export function getLeaderboardConfig(): LeaderboardConfig {
+  if (typeof window === 'undefined') return DEFAULT_LEADERBOARD_CONFIG;
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_CONFIG_KEY);
+    if (!raw) return DEFAULT_LEADERBOARD_CONFIG;
+    const parsed = JSON.parse(raw);
+    return {
+      hideFromDay: typeof parsed.hideFromDay === 'number' ? parsed.hideFromDay : 8,
+      suspenseEnabled: parsed.suspenseEnabled !== false,
+      announcementMessage: parsed.announcementMessage || DEFAULT_LEADERBOARD_CONFIG.announcementMessage,
+      updatedAt: parsed.updatedAt,
+    };
+  } catch {
+    return DEFAULT_LEADERBOARD_CONFIG;
+  }
+}
+
+export async function syncLeaderboardConfigWithServer(): Promise<LeaderboardConfig> {
+  if (typeof window === 'undefined') return getLeaderboardConfig();
+  try {
+    const res = await fetch('/api/leaderboard/config');
+    if (res.ok) {
+      const cfg: LeaderboardConfig = await res.json();
+      if (cfg && typeof cfg.hideFromDay === 'number') {
+        localStorage.setItem(LEADERBOARD_CONFIG_KEY, JSON.stringify(cfg));
+        window.dispatchEvent(new Event('pehchaan_leaderboard_config_changed'));
+        return cfg;
+      }
+    }
+  } catch (err) {
+    /* fallback to local cache */
+  }
+  return getLeaderboardConfig();
+}
+
+export async function updateLeaderboardConfig(
+  newConfig: Partial<LeaderboardConfig>
+): Promise<LeaderboardConfig> {
+  const current = getLeaderboardConfig();
+  const merged: LeaderboardConfig = {
+    ...current,
+    ...newConfig,
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    localStorage.setItem(LEADERBOARD_CONFIG_KEY, JSON.stringify(merged));
+    window.dispatchEvent(new Event('pehchaan_leaderboard_config_changed'));
+    fetch('/api/leaderboard/config', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(merged),
+    }).catch(err => console.warn('Failed to sync leaderboard config to server:', err));
+  } catch (err) {
+    console.error('Failed to save leaderboard config:', err);
+  }
+
+  return merged;
+}
+

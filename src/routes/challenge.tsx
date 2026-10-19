@@ -950,6 +950,30 @@ function Quiz() {
                 <Link to="/">All chapters <Compass size={14} className="ml-1" /></Link>
               </Button>
             </div>
+
+            {/* 🌸 Shakti Reflection Section (Post-Game Reflection Card) */}
+            <div className="bg-[#FFF7F8] border-2 border-[#1C332E] rounded-2xl p-4 sm:p-5 mt-6 max-w-lg mx-auto text-center space-y-2.5 shadow-[4px_4px_0px_#1C332E]">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FCE7F0] border border-[#B82348]/30 text-[#B82348] text-xs font-black tracking-wider">
+                🌸 SHAKTI REFLECTION
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-[#1C332E] font-display">
+                What Did You Learn from Today's Heroines?
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+                “Every inspiring woman leaves us with a lesson. What's yours?” Create your custom reflection card to share with classmates.
+              </p>
+              <div className="pt-1">
+                <Button
+                  size="sm"
+                  asChild
+                  className="font-bold text-xs h-9 bg-[#B82348] hover:bg-[#961c3b] text-white border-2 border-[#1C332E] shadow-[2px_2px_0px_#1C332E] rounded-xl cursor-pointer"
+                >
+                  <Link to="/heroines">
+                    Create My Reflection Card <ArrowRight size={13} className="ml-1" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </main>

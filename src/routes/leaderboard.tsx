@@ -16,6 +16,10 @@ import {
   Clock,
   CheckCircle2,
   Share2,
+  Sparkles,
+  Lock,
+  Unlock,
+  Flower2,
 } from 'lucide-react';
 import { ShareCardModal } from '@/components/share-card-modal';
 import { Button } from '@/components/ui/button';
@@ -30,7 +34,14 @@ import {
   type OverallLeaderboardEntry,
 } from '@/lib/leaderboard-store';
 import { DAILY_QUIZZES } from '@/data/quiz';
-import { getLiveDays, syncLiveDaysWithServer } from '@/lib/admin-store';
+import {
+  getLiveDays,
+  syncLiveDaysWithServer,
+  getLeaderboardConfig,
+  syncLeaderboardConfigWithServer,
+  getAdminSession,
+  type LeaderboardConfig,
+} from '@/lib/admin-store';
 
 const BEST_KEY_PREFIX = 'pehchaan-kaun-best-day-';
 
@@ -56,9 +67,96 @@ export const Route = createFileRoute('/leaderboard')({
   component: Leaderboard,
 });
 
+// 🌸 Festive "Stay Tuned" Suspense Announcement Component
+function StayTunedAnnouncement({
+  day,
+  isOverall,
+  message,
+}: {
+  day?: number;
+  isOverall?: boolean;
+  message?: string;
+}) {
+  return (
+    <div className="relative bg-[#FFF7F8] border-4 border-[#1C332E] rounded-3xl p-6 sm:p-10 md:p-12 shadow-[8px_8px_0px_#B82348] text-center max-w-3xl mx-auto my-6 sm:my-8 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+      {/* Decorative Washi Tape Top Tab */}
+      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FBF0C8] border-2 border-[#1C332E] px-6 py-1 rounded-sm shadow-[2px_2px_0px_#1C332E] text-xs font-black uppercase tracking-widest text-[#1C332E] rotate-[-1deg]">
+        🌸 SHUBH NAVRATRI · SACRED SUSPENSE 🌸
+      </div>
+
+      {/* Floating Floral & Diya Icons */}
+      <div className="flex items-center justify-center gap-3 pt-2">
+        <span className="text-3xl animate-bounce">🪔</span>
+        <div className="w-14 h-14 rounded-full bg-[#FCE7F0] border-2 border-[#1C332E] flex items-center justify-center text-[#B82348] shadow-[3px_3px_0px_#1C332E]">
+          <Flower2 size={28} />
+        </div>
+        <span className="text-3xl animate-bounce delay-150">🌺</span>
+      </div>
+
+      {/* Eyebrow badge */}
+      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#D4F4E2] border-2 border-[#1C332E] text-[#1C332E] text-xs font-extrabold tracking-wider shadow-[2px_2px_0px_#1C332E]">
+        <Sparkles size={14} className="text-[#B82348]" />
+        {isOverall ? 'FINAL CHAMPIONSHIP IN SUSPENSE' : `DAY ${String(day).padStart(2, '0')} REVEAL LOCKED`}
+      </div>
+
+      {/* Headline */}
+      <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#1C332E] font-['Baloo_2'] tracking-tight">
+        Stay Tuned!
+      </h2>
+
+      {/* Main Required Announcement Message */}
+      <div className="bg-white border-2 border-[#1C332E] rounded-2xl p-5 sm:p-6 max-w-xl mx-auto shadow-[4px_4px_0px_#1C332E]">
+        <p className="text-base sm:text-lg font-bold text-[#B82348] leading-relaxed">
+          “{message || 'The celebration is not over yet. Stay tuned for the final reveal!'}”
+        </p>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-3 leading-relaxed">
+          To preserve the sacred thrill and honor all courageous participants across India, final rankings, scores, and winner details are held in celebratory suspense until the official conclusion ceremony.
+        </p>
+      </div>
+
+      {/* Subtle festive note */}
+      <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-muted-foreground pt-2">
+        <span className="flex items-center gap-1.5">
+          <CheckCircle2 size={14} className="text-emerald-600" /> All attempts &amp; scores safely recorded
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Star size={14} className="text-amber-500 fill-amber-500" /> Official champions revealed at finale
+        </span>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+        <Button
+          asChild
+          className="w-full sm:w-auto font-black text-xs sm:text-sm h-11 px-6 rounded-2xl bg-[#B82348] hover:bg-[#961c3b] text-white border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer"
+        >
+          <Link to="/heroines">
+            Explore Heroines &amp; Reflect 🌸
+          </Link>
+        </Button>
+
+        <Button
+          asChild
+          variant="outline"
+          className="w-full sm:w-auto font-bold text-xs sm:text-sm h-11 px-6 rounded-2xl border-2 border-[#1C332E] bg-white hover:bg-[#FCE7F0] text-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer"
+        >
+          <Link to="/challenge">
+            Play Daily Challenge ⚡
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function Leaderboard() {
   const search = useSearch({ from: '/leaderboard' });
   const [liveDays, setLiveDays] = useState<number[]>(() => getLiveDays());
+
+  // Admin & Suspense Config State
+  const [adminSession, setAdminSession] = useState<{ isAuthenticated: boolean }>(() => getAdminSession());
+  const [adminPreviewPublic, setAdminPreviewPublic] = useState<boolean>(false);
+  const [leaderboardConfig, setLeaderboardConfig] = useState<LeaderboardConfig>(() => getLeaderboardConfig());
 
   const [activeTab, setActiveTab] = useState<'overall' | 'daily'>(
     search.day ? 'daily' : search.view === 'daily' ? 'daily' : 'overall'
@@ -173,20 +271,52 @@ function Leaderboard() {
     syncLiveDaysWithServer().then(days => {
       setLiveDays(days);
     });
-    syncLeaderboardWithServer().then(() => {
+    syncLeaderboardConfigWithServer().then(cfg => {
+      setLeaderboardConfig(cfg);
+    });
+    const s = getAdminSession();
+    setAdminSession(s);
+    syncLeaderboardWithServer(s.isAuthenticated).then(() => {
       loadData(getLiveDays());
     });
     const handleUpdate = () => {
       const days = getLiveDays();
       setLiveDays(days);
+      setAdminSession(getAdminSession());
+      setLeaderboardConfig(getLeaderboardConfig());
     };
     window.addEventListener('pehchaan_leaderboard_updated', handleUpdate);
     window.addEventListener('pehchaan_live_days_changed', handleUpdate);
+    window.addEventListener('pehchaan_leaderboard_config_changed', handleUpdate);
     return () => {
       window.removeEventListener('pehchaan_leaderboard_updated', handleUpdate);
       window.removeEventListener('pehchaan_live_days_changed', handleUpdate);
+      window.removeEventListener('pehchaan_leaderboard_config_changed', handleUpdate);
     };
   }, []);
+
+  // Whether current view is in suspense for this user
+  const isSuspenseActive = useMemo(() => {
+    // If admin is viewing and has NOT explicitly chosen to preview public view: show real standings
+    if (adminSession.isAuthenticated && !adminPreviewPublic) {
+      return false;
+    }
+    // Suspense must be enabled in config
+    if (!leaderboardConfig.suspenseEnabled) {
+      return false;
+    }
+
+    const hideDay = typeof leaderboardConfig.hideFromDay === 'number' ? leaderboardConfig.hideFromDay : 8;
+
+    if (activeTab === 'daily') {
+      // For Day-wise tab: hide if selectedDay >= hideDay (e.g. Day 8, 9, 10)
+      return selectedDay >= hideDay;
+    } else {
+      // For Overall Championship tab: hide if the competition has reached Day 8+
+      const latestLive = openDays[openDays.length - 1] || 1;
+      return latestLive >= hideDay;
+    }
+  }, [adminSession, adminPreviewPublic, leaderboardConfig, activeTab, selectedDay, openDays]);
 
   const filteredOverall = useMemo(() => {
     if (!searchQuery.trim()) return overallList;
@@ -242,6 +372,41 @@ function Leaderboard() {
 
   return (
     <main className="wrap section pb-16">
+      {/* 👑 ADMIN NOTICE BANNER */}
+      {adminSession.isAuthenticated && (
+        <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-500/15 border-2 border-amber-600 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5 text-xs font-bold text-amber-950 dark:text-amber-200">
+            <Crown size={20} className="text-amber-600 shrink-0" />
+            <span>
+              <strong>Admin Mode Active:</strong> You are viewing authentic student standings. Public visitors currently see the <b>“Stay Tuned”</b> suspense announcement for Day {leaderboardConfig.hideFromDay}+ and Overall.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAdminPreviewPublic(!adminPreviewPublic)}
+              className="text-xs font-extrabold h-8.5 border-amber-600 bg-white hover:bg-amber-100 text-amber-950 cursor-pointer shadow-xs"
+            >
+              {adminPreviewPublic ? (
+                <>
+                  <Unlock size={13} className="mr-1.5 text-emerald-600" /> View Admin Leaderboard
+                </>
+              ) : (
+                <>
+                  <Lock size={13} className="mr-1.5 text-amber-600" /> Preview Public Suspense
+                </>
+              )}
+            </Button>
+            <Button size="sm" asChild variant="ghost" className="text-xs h-8.5 text-amber-900 hover:text-amber-950">
+              <Link to="/admin">
+                Admin Panel <ArrowRight size={12} className="ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="text-center max-w-2xl mx-auto mb-8">
         <div className="eyebrow mb-2">
@@ -290,6 +455,9 @@ function Leaderboard() {
       {/* TAB 1: OVERALL MAIN CHAMPIONSHIP */}
       {/* ========================================================================= */}
       {activeTab === 'overall' && (
+        isSuspenseActive ? (
+          <StayTunedAnnouncement isOverall message={leaderboardConfig.announcementMessage} />
+        ) : (
         <div className="space-y-6">
           {/* Search Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 max-w-4xl mx-auto">
@@ -625,6 +793,7 @@ function Leaderboard() {
             </div>
           </div>
         </div>
+        )
       )}
 
       {/* ========================================================================= */}
@@ -637,23 +806,30 @@ function Leaderboard() {
             {DAILY_QUIZZES.map(quiz => {
               const isSelected = selectedDay === quiz.day;
               const isLive = liveDays.includes(quiz.day);
+              const hideDay = typeof leaderboardConfig.hideFromDay === 'number' ? leaderboardConfig.hideFromDay : 8;
+              const isLockedSuspense = leaderboardConfig.suspenseEnabled && quiz.day >= hideDay && (!adminSession.isAuthenticated || adminPreviewPublic);
               return (
                 <Button
                   key={quiz.day}
                   variant={isSelected ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedDay(quiz.day)}
-                  className={`shrink-0 text-xs gap-1.5 h-8.5 rounded-xl font-black border ${
+                  className={`shrink-0 text-xs gap-1.5 h-8.5 rounded-xl font-black border transition-all ${
                     isSelected ? 'bg-secondary text-secondary-foreground border-secondary-foreground/40 shadow-xs' : 'border-border'
                   }`}
                 >
                   <span>Day {String(quiz.day).padStart(2, '0')}</span>
                   {isLive && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
+                  {isLockedSuspense && <Lock size={10} className="text-amber-600 ml-0.5" title="Locked in suspense" />}
                 </Button>
               );
             })}
           </div>
 
+          {isSuspenseActive ? (
+            <StayTunedAnnouncement day={selectedDay} message={leaderboardConfig.announcementMessage} />
+          ) : (
+            <>
           {/* Active Day Banner */}
           <div className="bg-card border border-border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div>
@@ -871,6 +1047,8 @@ function Leaderboard() {
               </table>
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
 

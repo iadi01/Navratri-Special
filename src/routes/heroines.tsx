@@ -4,6 +4,7 @@ import { Search, Compass, BookOpen, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HEROINES_DATABASE, Heroine } from '@/data/heroines-data';
+import { ShaktiReflection } from '@/components/shakti-reflection';
 
 export const Route = createFileRoute('/heroines')({
   head: () => ({
@@ -202,6 +203,11 @@ function Gallery() {
         </div>
       )}
 
+      {/* 🌸 SHAKTI REFLECTION: WHAT DID YOU LEARN? */}
+      <div className="mt-16">
+        <ShaktiReflection />
+      </div>
+
       {/* Detailed Modal */}
       {selectedHeroine && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
@@ -241,15 +247,26 @@ function Gallery() {
               )}
             </div>
 
-            <div className="pt-2 flex items-center gap-3">
-              <Button asChild className="flex-1 font-extrabold h-10 text-xs rounded-xl">
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+              <Button
+                className="w-full sm:flex-1 font-extrabold h-10 text-xs rounded-xl bg-[#B82348] hover:bg-[#961c3b] text-white cursor-pointer"
+                onClick={() => {
+                  setSelectedHeroine(null);
+                  setTimeout(() => {
+                    document.getElementById('shakti-reflection')?.scrollIntoView({ behavior: 'smooth' });
+                  }, 150);
+                }}
+              >
+                Reflect on Her Legacy 🌸
+              </Button>
+              <Button asChild variant="outline" className="w-full sm:w-auto font-extrabold h-10 text-xs rounded-xl">
                 <Link to="/challenge">
-                  Play Daily Challenge <ArrowRight size={13} className="ml-1" />
+                  Play Challenge <ArrowRight size={13} className="ml-1" />
                 </Link>
               </Button>
               <Button
-                variant="outline"
-                className="font-bold h-10 text-xs rounded-xl"
+                variant="ghost"
+                className="w-full sm:w-auto font-bold h-10 text-xs rounded-xl"
                 onClick={() => setSelectedHeroine(null)}
               >
                 Close
