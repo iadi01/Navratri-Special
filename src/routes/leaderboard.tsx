@@ -21,6 +21,7 @@ import {
   Flower2,
 } from 'lucide-react';
 import { ShareCardModal } from '@/components/share-card-modal';
+import { RankBadge } from '@/components/rank-badge';
 import { Button } from '@/components/ui/button';
 import { DiyaIcon } from '@/components/diya-icon';
 import { Input } from '@/components/ui/input';
@@ -197,7 +198,8 @@ function Leaderboard() {
     if (!entry) return;
     const isOverall = !forDay && !entry.day && 'totalPoints' in entry;
     if (isOverall) {
-      const maxPoints = overallMaxScore;
+      const pBonus = entry.puzzleBonus || 0;
+      const maxPoints = overallMaxScore + pBonus;
       const points = Math.min(entry.totalPoints ?? 0, maxPoints);
       const totalQuestions = overallTotalQuestions;
       const firstTryCount = Math.min(entry.firstTryTotal ?? 0, totalQuestions);
@@ -218,6 +220,7 @@ function Leaderboard() {
         course: entry.course || 'BCA',
         year: entry.year || '1st Sem',
         tier,
+        puzzleBonus: entry.puzzleBonus,
       });
       return;
     }
@@ -432,15 +435,13 @@ function Leaderboard() {
           {/* 3-STEP PODIUM (Rank 1 Center, Rank 2 Left, Rank 3 Right) */}
           {filteredOverall.length >= 3 && !searchQuery && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto mb-8 items-end">
-              {/* #2 PODIUM STEP (LEFT - SOFT BUTTER / WARM GOLD) */}
+              {/* #2 PODIUM STEP (LEFT - SILVER RUNNER-UP) */}
               <div
                 onClick={() => setSelectedUserDetail(filteredOverall[1])}
-                className="order-2 md:order-1 rounded-2xl p-5 text-center flex flex-col justify-between relative shadow-sm bg-[var(--butter)]/55 dark:bg-amber-950/20 border-2 border-amber-300/70 dark:border-amber-800/60 hover:-translate-y-1 transition-all cursor-pointer group md:h-[275px]"
+                className="order-2 md:order-1 rounded-2xl p-5 text-center flex flex-col justify-between relative shadow-sm bg-gradient-to-b from-slate-100/90 via-slate-50 to-[var(--butter)]/40 dark:from-slate-800/40 dark:to-slate-900/40 border-2 border-slate-400/80 dark:border-slate-600 hover:-translate-y-1 transition-all cursor-pointer group md:h-[285px]"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-950 dark:text-amber-200 border border-amber-300/50 flex items-center gap-1">
-                    <Medal size={12} className="text-amber-600" /> Rank 2
-                  </span>
+                  <RankBadge rank={2} showLabel size="sm" />
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -449,18 +450,17 @@ function Leaderboard() {
                         e.stopPropagation();
                         handleOpenShare(filteredOverall[1], 2);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-amber-400 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-slate-400 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
                     >
                       <Share2 size={11} className="text-primary shrink-0" />
                       <span>Share</span>
                     </button>
-                    <span className="text-xs font-mono font-black text-amber-800/80 dark:text-amber-400">#2</span>
                   </div>
                 </div>
 
                 <div className="py-2">
-                  <div className="w-12 h-12 rounded-full bg-amber-400/25 text-amber-950 dark:text-amber-200 mx-auto flex items-center justify-center font-black text-lg mb-2 shadow-xs border border-amber-400/60">
-                    2
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-200 via-white to-slate-300 dark:from-slate-700 dark:to-slate-800 text-slate-800 dark:text-slate-100 mx-auto flex items-center justify-center font-black text-lg mb-2 shadow-xs border-2 border-slate-400">
+                    🥈
                   </div>
                   <h3 className="font-extrabold text-base text-foreground group-hover:text-primary transition-colors truncate">
                     {filteredOverall[1]?.fullName || filteredOverall[1]?.username}
@@ -470,33 +470,38 @@ function Leaderboard() {
                       {filteredOverall[1]?.course}
                     </span>
                   )}
+                  {filteredOverall[1]?.puzzleBonus ? (
+                    <div className="mt-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
+                        🧩 +{filteredOverall[1].puzzleBonus} Puzzle Extra
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-mono font-bold text-muted-foreground bg-background/70 px-2.5 py-0.5 rounded-full border border-border">
                     <Zap size={12} className="text-amber-600" /> {filteredOverall[1]?.totalTimeSeconds}s • {filteredOverall[1]?.daysCompleted}/{openDays.length} day
                   </div>
                 </div>
 
-                <div className="pt-2.5 border-t border-amber-200/80 dark:border-amber-900/60 flex items-center justify-between">
+                <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground uppercase font-bold">Total Score</span>
                   <span className="font-black text-lg text-foreground">
-                    {filteredOverall[1]?.totalPoints ?? 0}/{overallMaxScore}
+                    {filteredOverall[1]?.totalPoints ?? 0}/{overallMaxScore + (filteredOverall[1]?.puzzleBonus || 0)}
                   </span>
                 </div>
               </div>
 
-              {/* #1 PODIUM STEP (CENTER - TALLEST - SOFT PETAL / ROSE) */}
+              {/* #1 PODIUM STEP (CENTER - TALLEST - GOLD GRAND CHAMPION) */}
               <div
                 onClick={() => setSelectedUserDetail(filteredOverall[0])}
-                className="order-1 md:order-2 rounded-2xl p-6 text-center flex flex-col justify-between relative shadow-md bg-[var(--petal)]/80 dark:bg-rose-950/25 border-2 border-primary/40 dark:border-primary/50 hover:-translate-y-1 transition-all cursor-pointer group md:h-[310px]"
+                className="order-1 md:order-2 rounded-2xl p-6 text-center flex flex-col justify-between relative shadow-lg bg-gradient-to-b from-amber-100/90 via-yellow-50 to-[var(--petal)]/80 dark:from-amber-950/40 dark:to-rose-950/30 border-2 border-amber-500 hover:-translate-y-1 transition-all cursor-pointer group md:h-[320px]"
               >
-                {/* Gold Star Floating Badge */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[var(--butter)] text-foreground px-3 py-0.5 rounded-full shadow-xs font-black text-[11px] flex items-center gap-1 border border-border">
-                  <Star size={12} className="fill-amber-500 text-amber-600" /> 1ST PLACE
+                {/* Gold Floating Crown Badge */}
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-950 px-3.5 py-0.5 rounded-full shadow-[2px_2px_0px_#b45309] font-black text-[11px] flex items-center gap-1 border border-amber-600">
+                  <Crown size={12} className="fill-amber-800 text-amber-800" /> 1ST PLACE WINNER
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center gap-1">
-                    <Crown size={12} /> Grand Champion
-                  </span>
+                  <RankBadge rank={1} showLabel size="sm" />
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -505,18 +510,17 @@ function Leaderboard() {
                         e.stopPropagation();
                         handleOpenShare(filteredOverall[0], 1);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-primary/40 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-amber-500/60 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
                     >
                       <Share2 size={11} className="text-primary shrink-0" />
                       <span>Share</span>
                     </button>
-                    <span className="text-xs font-mono font-black text-primary">#1</span>
                   </div>
                 </div>
 
                 <div className="py-2">
-                  <div className="w-14 h-14 rounded-full bg-primary text-primary-foreground mx-auto flex items-center justify-center font-black text-xl mb-2 shadow-sm border-2 border-primary/60">
-                    1
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-300 via-yellow-200 to-amber-400 text-amber-950 mx-auto flex items-center justify-center font-black text-2xl mb-2 shadow-md border-2 border-amber-600">
+                    👑
                   </div>
                   <h3 className="font-black text-lg text-foreground group-hover:text-primary transition-colors truncate">
                     {filteredOverall[0]?.fullName || filteredOverall[0]?.username}
@@ -526,28 +530,33 @@ function Leaderboard() {
                       {filteredOverall[0]?.course} • {filteredOverall[0]?.year}
                     </span>
                   )}
+                  {filteredOverall[0]?.puzzleBonus ? (
+                    <div className="mt-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-900 dark:text-emerald-200 border border-emerald-500/40">
+                        🧩 +{filteredOverall[0].puzzleBonus} Puzzle Extra
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-muted-foreground font-mono bg-background/80 border border-border px-2.5 py-0.5 rounded-full">
                     <Zap size={12} className="text-primary" /> {filteredOverall[0]?.totalTimeSeconds}s • {filteredOverall[0]?.daysCompleted}/{openDays.length} day
                   </div>
                 </div>
 
-                <div className="pt-2.5 border-t border-primary/20 dark:border-rose-900/60 flex items-center justify-between">
-                  <span className="text-[11px] text-primary uppercase font-black">Champion Score</span>
-                  <span className="font-black text-2xl text-primary">
-                    {filteredOverall[0]?.totalPoints ?? 0}/{overallMaxScore}
+                <div className="pt-2.5 border-t border-amber-300 dark:border-rose-900/60 flex items-center justify-between">
+                  <span className="text-[11px] text-amber-900 dark:text-amber-200 uppercase font-black">Grand Champion Score</span>
+                  <span className="font-black text-2xl text-amber-900 dark:text-amber-300">
+                    {filteredOverall[0]?.totalPoints ?? 0}/{overallMaxScore + (filteredOverall[0]?.puzzleBonus || 0)}
                   </span>
                 </div>
               </div>
 
-              {/* #3 PODIUM STEP (RIGHT - SOFT SKY BLUE) */}
+              {/* #3 PODIUM STEP (RIGHT - BRONZE 2ND RUNNER-UP) */}
               <div
                 onClick={() => setSelectedUserDetail(filteredOverall[2])}
-                className="order-3 rounded-2xl p-5 text-center flex flex-col justify-between relative shadow-sm bg-[var(--sky)]/55 dark:bg-sky-950/20 border-2 border-sky-300/70 dark:border-sky-800/60 hover:-translate-y-1 transition-all cursor-pointer group md:h-[260px]"
+                className="order-3 rounded-2xl p-5 text-center flex flex-col justify-between relative shadow-sm bg-gradient-to-b from-amber-700/10 via-orange-600/10 to-[var(--sky)]/35 dark:from-amber-950/20 dark:to-sky-950/20 border-2 border-amber-700/50 hover:-translate-y-1 transition-all cursor-pointer group md:h-[275px]"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-950 dark:text-sky-200 border border-sky-300/50 flex items-center gap-1">
-                    <Award size={12} className="text-sky-600" /> Rank 3
-                  </span>
+                  <RankBadge rank={3} showLabel size="sm" />
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -556,18 +565,17 @@ function Leaderboard() {
                         e.stopPropagation();
                         handleOpenShare(filteredOverall[2], 3);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-sky-400 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-background hover:bg-[var(--butter)] text-foreground border border-amber-700/50 shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
                     >
                       <Share2 size={11} className="text-primary shrink-0" />
                       <span>Share</span>
                     </button>
-                    <span className="text-xs font-mono font-black text-sky-800/80 dark:text-sky-400">#3</span>
                   </div>
                 </div>
 
                 <div className="py-2">
-                  <div className="w-12 h-12 rounded-full bg-sky-400/25 text-sky-950 dark:text-sky-200 mx-auto flex items-center justify-center font-black text-lg mb-2 shadow-xs border border-sky-400/60">
-                    3
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600/30 via-orange-500/30 to-amber-700/30 text-amber-950 dark:text-amber-200 mx-auto flex items-center justify-center font-black text-lg mb-2 shadow-xs border-2 border-amber-700/60">
+                    🥉
                   </div>
                   <h3 className="font-extrabold text-base text-foreground group-hover:text-primary transition-colors truncate">
                     {filteredOverall[2]?.fullName || filteredOverall[2]?.username}
@@ -577,15 +585,22 @@ function Leaderboard() {
                       {filteredOverall[2]?.course}
                     </span>
                   )}
+                  {filteredOverall[2]?.puzzleBonus ? (
+                    <div className="mt-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
+                        🧩 +{filteredOverall[2].puzzleBonus} Puzzle Extra
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="inline-flex items-center gap-1 mt-2 text-xs font-mono font-bold text-muted-foreground bg-background/70 px-2.5 py-0.5 rounded-full border border-border">
-                    <Zap size={12} className="text-sky-600" /> {filteredOverall[2]?.totalTimeSeconds}s • {filteredOverall[2]?.daysCompleted}/{openDays.length} day
+                    <Zap size={12} className="text-amber-700" /> {filteredOverall[2]?.totalTimeSeconds}s • {filteredOverall[2]?.daysCompleted}/{openDays.length} day
                   </div>
                 </div>
 
-                <div className="pt-2.5 border-t border-sky-200/80 dark:border-sky-900/60 flex items-center justify-between">
+                <div className="pt-2.5 border-t border-amber-700/30 dark:border-amber-900/60 flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground uppercase font-bold">Total Score</span>
                   <span className="font-black text-lg text-foreground">
-                    {filteredOverall[2]?.totalPoints ?? 0}/{overallMaxScore}
+                    {filteredOverall[2]?.totalPoints ?? 0}/{overallMaxScore + (filteredOverall[2]?.puzzleBonus || 0)}
                   </span>
                 </div>
               </div>
@@ -633,22 +648,8 @@ function Leaderboard() {
                             : 'hover:bg-muted/40'
                         }`}
                       >
-                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center font-mono">
-                          {rank === 1 ? (
-                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30">
-                              #1
-                            </span>
-                          ) : rank === 2 ? (
-                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-300">
-                              #2
-                            </span>
-                          ) : rank === 3 ? (
-                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-sky-500/15 text-sky-900 dark:text-sky-200 border border-sky-300">
-                              #3
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground font-extrabold text-xs">#{rank}</span>
-                          )}
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
+                          <RankBadge rank={rank} />
                         </td>
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 font-bold text-foreground">
@@ -656,11 +657,11 @@ function Leaderboard() {
                             <div
                               className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                                 rank === 1
-                                  ? 'bg-primary/15 text-primary border border-primary/30'
+                                  ? 'bg-amber-400/25 text-amber-950 dark:text-amber-200 border-2 border-amber-500'
                                   : rank === 2
-                                  ? 'bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-300'
+                                  ? 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100 border-2 border-slate-400'
                                   : rank === 3
-                                  ? 'bg-sky-500/20 text-sky-900 dark:text-sky-200 border border-sky-300'
+                                  ? 'bg-orange-500/20 text-amber-900 dark:text-amber-200 border-2 border-amber-600/50'
                                   : 'bg-muted text-foreground'
                               }`}
                             >
@@ -681,6 +682,11 @@ function Leaderboard() {
                                     • {entry.year}
                                   </span>
                                 )}
+                                {entry.puzzleBonus ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
+                                    🧩 +{entry.puzzleBonus} Puzzle Extra
+                                  </span>
+                                ) : null}
                                 <span className="text-[9px] text-muted-foreground font-mono md:hidden">
                                   • ⚡{entry.totalTimeSeconds}s • {entry.daysCompleted}/{openDays.length} day
                                 </span>
@@ -690,9 +696,16 @@ function Leaderboard() {
                         </td>
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
-                          <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
-                            {entry.totalPoints}/{overallMaxScore}
-                          </span>
+                          <div className="flex flex-col items-center">
+                            <span className="font-black text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+                              {entry.totalPoints}/{overallMaxScore + (entry.puzzleBonus || 0)}
+                            </span>
+                            {entry.puzzleBonus ? (
+                              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 whitespace-nowrap">
+                                ({entry.quizPoints ?? (entry.totalPoints - entry.puzzleBonus)} + {entry.puzzleBonus} puzzle)
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4 text-center font-mono hidden md:table-cell">
@@ -890,22 +903,8 @@ function Leaderboard() {
                             : 'hover:bg-muted/40'
                         }`}
                       >
-                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center font-mono">
-                          {rank === 1 ? (
-                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-primary/15 text-primary border border-primary/30">
-                              #1
-                            </span>
-                          ) : rank === 2 ? (
-                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-300">
-                              #2
-                            </span>
-                          ) : rank === 3 ? (
-                            <span className="inline-flex items-center justify-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-black bg-sky-500/15 text-sky-900 dark:text-sky-200 border border-sky-300">
-                              #3
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground font-extrabold text-xs">#{rank}</span>
-                          )}
+                        <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 text-center">
+                          <RankBadge rank={rank} />
                         </td>
 
                         <td className="py-2.5 sm:py-3.5 px-2 sm:px-4 font-bold text-foreground">
@@ -1019,9 +1018,19 @@ function Leaderboard() {
                   {selectedUserDetail.username.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-foreground">
-                    {selectedUserDetail.fullName || selectedUserDetail.username}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-foreground">
+                      {selectedUserDetail.fullName || selectedUserDetail.username}
+                    </h3>
+                    <RankBadge
+                      rank={
+                        activeTab === 'overall'
+                          ? Math.max(1, filteredOverall.findIndex(e => e.username === selectedUserDetail.username) + 1)
+                          : Math.max(1, filteredDaily.findIndex(e => (e as any).id === (selectedUserDetail as any).id) + 1)
+                      }
+                      size="sm"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground font-mono font-bold">@{selectedUserDetail.username}</p>
                 </div>
               </div>
@@ -1060,15 +1069,38 @@ function Leaderboard() {
               </div>
             </div>
 
+            {/* 🧩 Navratri Puzzle Bonus Card (If participant played puzzle) */}
+            {(selectedUserDetail as any).puzzleBonus ? (
+              <div className="bg-emerald-500/10 border-2 border-emerald-500/30 rounded-2xl p-3.5 space-y-1.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase text-emerald-800 dark:text-emerald-300 tracking-wider flex items-center gap-1.5">
+                    <span>🧩</span> Navratri Puzzle Challenge Bonus
+                  </span>
+                  <span className="text-xs font-mono font-black text-emerald-700 dark:text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    +{(selectedUserDetail as any).puzzleBonus} PTS
+                  </span>
+                </div>
+                <div className="text-[11px] text-emerald-900/80 dark:text-emerald-200/80 flex items-center justify-between">
+                  <span>Level {(selectedUserDetail as any).puzzleLevels || 1} Solved · {(selectedUserDetail as any).puzzleMoves || 0} Moves</span>
+                  <span className="font-mono font-bold">⚡ {(selectedUserDetail as any).puzzleTimeSeconds || 0}s</span>
+                </div>
+              </div>
+            ) : null}
+
             {/* Score & Speed Prominent Badges */}
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl">
                 <span className="text-[11px] text-primary uppercase block font-black">Total Score</span>
                 <strong className="text-2xl font-black text-primary">
                   {'totalPoints' in selectedUserDetail
-                    ? `${selectedUserDetail.totalPoints}/${overallMaxScore}`
+                    ? `${selectedUserDetail.totalPoints}/${overallMaxScore + ((selectedUserDetail as any).puzzleBonus || 0)}`
                     : `${selectedUserDetail.points}/${(selectedUserDetail as any).day === 10 ? 100 : 30}`}
                 </strong>
+                {'totalPoints' in selectedUserDetail && (selectedUserDetail as any).puzzleBonus ? (
+                  <span className="text-[10px] block font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
+                    ({(selectedUserDetail as any).quizPoints ?? ((selectedUserDetail as any).totalPoints - (selectedUserDetail as any).puzzleBonus)} quiz + {(selectedUserDetail as any).puzzleBonus} puzzle)
+                  </span>
+                ) : null}
               </div>
               <div className="p-3.5 bg-secondary border border-secondary-foreground/20 rounded-2xl">
                 <span className="text-[11px] text-secondary-foreground uppercase block font-black">Speed Record</span>
@@ -1083,7 +1115,11 @@ function Leaderboard() {
               <Button
                 className="w-full font-black h-11 text-xs sm:text-sm rounded-xl gap-2 bg-[var(--butter)] text-[var(--foreground)] hover:bg-[#fff0a6] border-2 border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
                 onClick={() => {
-                  handleOpenShare(selectedUserDetail, 1);
+                  const rIdx =
+                    activeTab === 'overall'
+                      ? Math.max(1, filteredOverall.findIndex(e => e.username === selectedUserDetail.username) + 1)
+                      : Math.max(1, filteredDaily.findIndex(e => (e as any).id === (selectedUserDetail as any).id) + 1);
+                  handleOpenShare(selectedUserDetail, rIdx);
                 }}
               >
                 <Share2 size={16} className="text-primary stroke-[2.5]" />

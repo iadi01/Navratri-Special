@@ -25,6 +25,7 @@ interface ShareCardModalProps {
   course?: string;
   year?: string;
   tier: string;
+  puzzleBonus?: number;
 }
 
 export function ShareCardModal({
@@ -42,6 +43,7 @@ export function ShareCardModal({
   course = 'BCA',
   year = '1st Sem',
   tier,
+  puzzleBonus,
 }: ShareCardModalProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -56,8 +58,9 @@ export function ShareCardModal({
   const safeAccuracy = Math.min(firstTryCount, totalQuestions);
 
   const isOverall = dayTitle.toLowerCase().includes('overall');
+  const puzzleExtraText = puzzleBonus && puzzleBonus > 0 ? ` (+${puzzleBonus} Extra Points for Puzzle Challenge)` : '';
   const shareCaption = isOverall
-    ? `🏆 I scored ${safePoints}/${maxPoints} points in the Overall Championship (Day ${String(day).padStart(2, '0')}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`
+    ? `🏆 I scored ${safePoints}/${maxPoints} points${puzzleExtraText} in the Overall Championship (Day ${String(day).padStart(2, '0')}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`
     : `🏆 I scored ${safePoints}/${maxPoints} points in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" in ${timeTaken}s (Rank #${rank})! 🌸\n\nCan you beat my score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
 
 
@@ -197,6 +200,13 @@ export function ShareCardModal({
     ctx.font = '800 20px "Baloo 2", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.fillText(`🏆 ${tier.toUpperCase()}`, width / 2, tierY);
 
+    if (puzzleBonus && puzzleBonus > 0) {
+      ctx.fillStyle = '#047857';
+      ctx.font = '800 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.letterSpacing = '0.5px';
+      ctx.fillText(`🧩 INCLUDES +${puzzleBonus} EXTRA PUZZLE CHALLENGE BONUS`, width / 2, tierY + 20);
+    }
+
     // 6. Stat Pills (Time, Accuracy, Rank)
     const pillY = cardY + 298;
     const statBoxWidth = 260;
@@ -205,10 +215,19 @@ export function ShareCardModal({
     const totalStatsWidth = statBoxWidth * 3 + gap * 2;
     const startX = (width - totalStatsWidth) / 2;
 
+    const rankBadgeConfig =
+      rank === 1
+        ? { icon: '🥇', val: '#1 WINNER', bg: '#fef08a' }
+        : rank === 2
+        ? { icon: '🥈', val: '#2 RUNNER UP', bg: '#e2e8f0' }
+        : rank === 3
+        ? { icon: '🥉', val: '#3 2ND RUNNER UP', bg: '#ffedd5' }
+        : { icon: '🏅', val: `#${rank}`, bg: '#fbf4f4' };
+
     const stats = [
       { label: 'TIME TAKEN', val: `${timeTaken}s`, icon: '⏱️', bg: '#fbf4f4' },
       { label: 'ACCURACY', val: `${safeAccuracy}/${totalQuestions}`, icon: '🎯', bg: '#fef08a' },
-      { label: 'CAMPUS RANK', val: `#${rank}`, icon: '🏅', bg: '#fbf4f4' },
+      { label: 'CAMPUS RANK', val: rankBadgeConfig.val, icon: rankBadgeConfig.icon, bg: rankBadgeConfig.bg },
     ];
 
     stats.forEach((st, idx) => {
@@ -373,6 +392,19 @@ export function ShareCardModal({
             </div>
           )}
         </div>
+
+        {/* Puzzle Extra Bonus Notice */}
+        {puzzleBonus && puzzleBonus > 0 && (
+          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-600 text-emerald-950 dark:text-emerald-200 text-xs flex items-center justify-between gap-2 mb-3 shadow-[2px_2px_0_var(--foreground)] shrink-0 font-bold">
+            <span className="flex items-center gap-1.5">
+              <span>🧩</span>
+              <span>Includes +{puzzleBonus} Extra Puzzle Bonus Points</span>
+            </span>
+            <span className="text-[10px] font-mono uppercase bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+              Bonus Added
+            </span>
+          </div>
+        )}
 
         {/* Status Message */}
         {statusMessage && (

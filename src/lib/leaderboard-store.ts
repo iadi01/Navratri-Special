@@ -35,6 +35,11 @@ export type OverallLeaderboardEntry = {
   rollNo?: string;
   email?: string;
   totalPoints: number;
+  quizPoints?: number;
+  puzzleBonus?: number;
+  puzzleLevels?: number;
+  puzzleTimeSeconds?: number;
+  puzzleMoves?: number;
   totalTimeSeconds: number;
   daysCompleted: number;
   firstTryTotal: number;
@@ -51,7 +56,24 @@ export type OverallLeaderboardEntry = {
   }[];
 };
 
+export type PuzzleScoreEntry = {
+  id: string;
+  username: string;
+  fullName: string;
+  course?: string;
+  year?: string;
+  batch?: string;
+  rollNo?: string;
+  date: string;
+  completedLevels: number;
+  totalTimeSeconds: number;
+  totalMoves: number;
+  pointsEarned: number;
+  submittedAt: string;
+};
+
 const LEADERBOARD_KEY = 'pehchaan_leaderboard_v1';
+export const PUZZLE_SCORES_CACHE_KEY = 'pehchaan_puzzle_scores_all_v1';
 const USER_PROFILE_KEY = 'pehchaan_user_profile_v1';
 const QUIZ_ATTEMPTS_PREFIX = 'pehchaan_attempt_day_';
 
@@ -321,12 +343,34 @@ export function writeLeaderboardToStorage(entries: LeaderboardEntry[]) {
   }
 }
 
-export async function syncLeaderboardWithServer(): Promise<LeaderboardEntry[]> {
+export function readPuzzleScoresFromStorage(): PuzzleScoreEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PUZZLE_SCORES_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writePuzzleScoresToStorage(entries: PuzzleScoreEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PUZZLE_SCORES_CACHE_KEY, JSON.stringify(entries));
+  } catch {}
+}
+
+export async function syncLeaderboardWithServer(isAdmin?: boolean): Promise<LeaderboardEntry[]> {
   if (typeof window === 'undefined') return readLeaderboardFromStorage();
   try {
-    const res = await fetch('/api/scores');
-    if (res.ok) {
-      const serverEntries: LeaderboardEntry[] = await res.json();
+    const scoresUrl = isAdmin ? '/api/scores?admin=true' : '/api/scores';
+    const [scoresRes, puzzleRes] = await Promise.allSettled([
+      fetch(scoresUrl),
+      fetch('/api/puzzle/leaderboard?date=all'),
+    ]);
+
+    if (scoresRes.status === 'fulfilled' && scoresRes.value.ok) {
+      const serverEntries: LeaderboardEntry[] = await scoresRes.value.json();
       if (Array.isArray(serverEntries)) {
         const cleanServerEntries = serverEntries
           .filter(e => !e.id?.startsWith('seed-'))
@@ -340,7 +384,13 @@ export async function syncLeaderboardWithServer(): Promise<LeaderboardEntry[]> {
             };
           });
         localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(cleanServerEntries));
-        return cleanServerEntries;
+      }
+    }
+
+    if (puzzleRes.status === 'fulfilled' && puzzleRes.value.ok) {
+      const puzzleEntries = await puzzleRes.value.json();
+      if (Array.isArray(puzzleEntries)) {
+        writePuzzleScoresToStorage(puzzleEntries);
       }
     }
   } catch (err) {
@@ -386,6 +436,57 @@ export function getLeaderboardEntries(day?: number): LeaderboardEntry[] {
 
 export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboardEntry[] {
   const all = readLeaderboardFromStorage();
+  const puzzleScores = readPuzzleScoresFromStorage();
+
+  // 1. Build lookup for puzzle bonuses (matched by rollNo, fullName, or username)
+  const puzzleMap = new Map<string, {
+    puzzleBonus: number;
+    puzzleLevels: number;
+    puzzleMoves: number;
+    puzzleTimeSeconds: number;
+    submittedAt?: string;
+    course?: string;
+    year?: string;
+    batch?: string;
+    rollNo?: string;
+    fullName?: string;
+    username?: string;
+  }>();
+
+  for (const p of puzzleScores) {
+    const pRoll = (p.rollNo || '').trim().toUpperCase();
+    const pFull = (p.fullName || '').trim().toLowerCase();
+    const pUser = (p.username || '').trim().toLowerCase();
+    const pts = Number(p.pointsEarned || 0);
+
+    const data = {
+      puzzleBonus: pts,
+      puzzleLevels: Number(p.completedLevels || 1),
+      puzzleMoves: Number(p.totalMoves || 0),
+      puzzleTimeSeconds: Number(p.totalTimeSeconds || 0),
+      submittedAt: p.submittedAt,
+      course: p.course,
+      year: p.year,
+      batch: p.batch,
+      rollNo: p.rollNo,
+      fullName: p.fullName,
+      username: p.username,
+    };
+
+    const keys = [
+      pRoll ? `roll_${pRoll}` : null,
+      pFull ? `name_${pFull}` : null,
+      pUser ? `name_${pUser}` : null,
+    ].filter(Boolean) as string[];
+
+    for (const k of keys) {
+      const existing = puzzleMap.get(k);
+      if (!existing || pts > existing.puzzleBonus) {
+        puzzleMap.set(k, data);
+      }
+    }
+  }
+
   const userMap = new Map<string, {
     username: string;
     fullName?: string;
@@ -441,9 +542,10 @@ export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboar
 
   const overallList: OverallLeaderboardEntry[] = [];
   const filterActive = Array.isArray(allowedDays) && allowedDays.length > 0 ? new Set(allowedDays) : null;
+  const matchedPuzzleKeys = new Set<string>();
 
   for (const user of userMap.values()) {
-    let totalPoints = 0;
+    let quizPoints = 0;
     let totalTimeSeconds = 0;
     let firstTryTotal = 0;
     let bestDay = 1;
@@ -454,7 +556,7 @@ export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboar
     for (const [day, score] of user.dayScores.entries()) {
       const isCounted = !filterActive || filterActive.has(day);
       if (isCounted) {
-        totalPoints += score.points;
+        quizPoints += score.points;
         totalTimeSeconds += score.timeSeconds;
         firstTryTotal += score.firstTryCount;
         daysCompleted += 1;
@@ -475,6 +577,28 @@ export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboar
 
     dayBreakdown.sort((a, b) => a.day - b.day);
 
+    // 🧩 Check for Puzzle Challenge Bonus (matched by rollNo, fullName, or username)
+    const cleanRoll = (user.rollNo || '').trim().toUpperCase();
+    const cleanName = (user.fullName || user.username || '').trim().toLowerCase();
+    const cleanUser = user.username.trim().toLowerCase();
+
+    const rollKey = cleanRoll ? `roll_${cleanRoll}` : '';
+    const nameKey = cleanName ? `name_${cleanName}` : '';
+    const userKey = cleanUser ? `name_${cleanUser}` : '';
+
+    const pData = (rollKey && puzzleMap.get(rollKey)) ||
+                  (nameKey && puzzleMap.get(nameKey)) ||
+                  (userKey && puzzleMap.get(userKey));
+
+    if (pData) {
+      if (rollKey) matchedPuzzleKeys.add(rollKey);
+      if (nameKey) matchedPuzzleKeys.add(nameKey);
+      if (userKey) matchedPuzzleKeys.add(userKey);
+    }
+
+    const puzzleBonus = pData?.puzzleBonus || 0;
+    const totalPoints = quizPoints + puzzleBonus;
+
     overallList.push({
       username: user.username,
       fullName: user.fullName || user.username,
@@ -484,6 +608,11 @@ export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboar
       rollNo: user.rollNo || '-',
       email: user.email || '-',
       totalPoints,
+      quizPoints,
+      puzzleBonus: puzzleBonus > 0 ? puzzleBonus : undefined,
+      puzzleLevels: pData?.puzzleLevels,
+      puzzleTimeSeconds: pData?.puzzleTimeSeconds,
+      puzzleMoves: pData?.puzzleMoves,
       totalTimeSeconds: Number(totalTimeSeconds.toFixed(1)),
       daysCompleted,
       firstTryTotal,
@@ -493,13 +622,58 @@ export function getOverallLeaderboard(allowedDays?: number[]): OverallLeaderboar
     });
   }
 
+  // 🧩 Also include participants who played ONLY the puzzle (if not already matched)
+  for (const p of puzzleScores) {
+    const pRoll = (p.rollNo || '').trim().toUpperCase();
+    const pFull = (p.fullName || '').trim().toLowerCase();
+    const pUser = (p.username || '').trim().toLowerCase();
+
+    const rollKey = pRoll ? `roll_${pRoll}` : '';
+    const nameKey = pFull ? `name_${pFull}` : '';
+    const userKey = pUser ? `name_${pUser}` : '';
+
+    const alreadyMatched = (rollKey && matchedPuzzleKeys.has(rollKey)) ||
+                           (nameKey && matchedPuzzleKeys.has(nameKey)) ||
+                           (userKey && matchedPuzzleKeys.has(userKey));
+
+    if (!alreadyMatched) {
+      if (rollKey) matchedPuzzleKeys.add(rollKey);
+      if (nameKey) matchedPuzzleKeys.add(nameKey);
+      if (userKey) matchedPuzzleKeys.add(userKey);
+
+      const pts = Number(p.pointsEarned || 0);
+      overallList.push({
+        username: p.username || p.fullName,
+        fullName: p.fullName || p.username,
+        course: p.course || 'Not specified',
+        year: p.year || 'Not specified',
+        batch: p.batch || 'Not specified',
+        rollNo: p.rollNo || '-',
+        email: '-',
+        totalPoints: pts,
+        quizPoints: 0,
+        puzzleBonus: pts,
+        puzzleLevels: p.completedLevels,
+        puzzleTimeSeconds: p.totalTimeSeconds,
+        puzzleMoves: p.totalMoves,
+        totalTimeSeconds: Number((p.totalTimeSeconds || 0).toFixed(1)),
+        daysCompleted: 0,
+        firstTryTotal: 0,
+        bestDay: 1,
+        lastActive: p.submittedAt || new Date().toISOString(),
+        dayBreakdown: [],
+      });
+    }
+  }
+
   return overallList.sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
     if (a.totalTimeSeconds !== b.totalTimeSeconds) return a.totalTimeSeconds - b.totalTimeSeconds;
-    if (b.daysCompleted !== a.daysCompleted) return b.daysCompleted - a.daysCompleted;
+    if (b.firstTryTotal !== a.firstTryTotal) return b.firstTryTotal - a.firstTryTotal;
     return new Date(a.lastActive).getTime() - new Date(b.lastActive).getTime();
   });
 }
+
 
 export function submitLeaderboardScore(params: {
   username: string;

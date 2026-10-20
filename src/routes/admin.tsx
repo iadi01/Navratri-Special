@@ -36,6 +36,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RankBadge } from '@/components/rank-badge';
 import { DAILY_QUIZZES, type DailyQuiz, type Question } from '@/data/quiz';
 import {
   getAdminSession,
@@ -229,7 +230,7 @@ function AdminPage() {
     if (s.isAuthenticated) {
       setAdminList(getAllAdmins());
       syncAdminsFromServer().then(list => setAdminList(list));
-      syncLeaderboardWithServer().then(() => {
+      syncLeaderboardWithServer(true).then(() => {
         setParticipants(getOverallLeaderboard());
       });
     }
@@ -474,15 +475,21 @@ function AdminPage() {
           type: 'success',
           text: `Day ${editingStudent.day} marks and details for "${editingStudent.fullName}" successfully updated in database!`,
         });
-        await syncLeaderboardWithServer();
+        await syncLeaderboardWithServer(true);
         const updatedList = getOverallLeaderboard();
         setParticipants(updatedList);
-        if (selectedStudent?.username === editingStudent.username) {
-          const updatedSelected = updatedList.find(p => p.username === editingStudent.username);
+        if (
+          selectedStudent?.username === editingStudent.username ||
+          (selectedStudent?.fullName && selectedStudent.fullName === editingStudent.fullName)
+        ) {
+          const updatedSelected = updatedList.find(
+            p => p.username === editingStudent.username || p.fullName === editingStudent.fullName
+          );
           if (updatedSelected) {
             setSelectedStudent(updatedSelected);
           }
         }
+        window.dispatchEvent(new Event('pehchaan_leaderboard_updated'));
         setEditingStudent(null);
       } else {
         setStudentActionMsg({ type: 'error', text: data.error || 'Failed to update student score.' });
@@ -508,7 +515,7 @@ function AdminPage() {
       });
       const data = await res.json();
       if (data.success) {
-        await syncLeaderboardWithServer();
+        await syncLeaderboardWithServer(true);
         setParticipants(getOverallLeaderboard());
         if (selectedStudent?.username === st.username) {
           setSelectedStudent(null);
@@ -1367,6 +1374,7 @@ function AdminPage() {
               <table className="w-full text-left border-collapse text-xs md:text-sm">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                    <th className="py-3 px-3 text-center w-14">Rank</th>
                     <th className="py-3 px-4">Student / User</th>
                     <th className="py-3 px-4">Course</th>
                     <th className="py-3 px-4">Semester &amp; Batch</th>
@@ -1383,6 +1391,10 @@ function AdminPage() {
                       onClick={() => setSelectedStudent(st)}
                       className="cursor-pointer transition-colors hover:bg-muted/40"
                     >
+                      <td className="py-3 px-3 text-center">
+                        <RankBadge rank={idx + 1} size="sm" />
+                      </td>
+
                       <td className="py-3 px-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
@@ -1404,8 +1416,13 @@ function AdminPage() {
                         {st.batch && <span className="block text-[11px] font-mono">{st.batch}</span>}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-extrabold text-primary">
-                        {st.totalPoints} pts
+                      <td className="py-3 px-4 text-center">
+                        <div className="font-extrabold text-primary">{st.totalPoints} pts</div>
+                        {st.puzzleBonus ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap mt-0.5">
+                            🧩 +{st.puzzleBonus} Puzzle
+                          </span>
+                        ) : null}
                       </td>
 
                       <td className="py-3 px-4 text-center font-mono text-emerald-600 dark:text-emerald-400">
@@ -1485,9 +1502,15 @@ function AdminPage() {
                   {selectedStudent.username.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-foreground">
-                    {selectedStudent.fullName || selectedStudent.username}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-foreground">
+                      {selectedStudent.fullName || selectedStudent.username}
+                    </h3>
+                    <RankBadge
+                      rank={Math.max(1, participants.findIndex(p => p.username === selectedStudent.username) + 1)}
+                      size="sm"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground font-mono">@{selectedStudent.username}</p>
                 </div>
               </div>
@@ -1530,11 +1553,39 @@ function AdminPage() {
               </div>
             </div>
 
+            {/* 🧩 Navratri Puzzle Bonus Banner */}
+            {selectedStudent.puzzleBonus ? (
+              <div className="p-3.5 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🧩</span>
+                  <div>
+                    <div className="font-extrabold text-emerald-950 dark:text-emerald-200">
+                      Navratri Puzzle Challenge Bonus
+                    </div>
+                    <span className="text-[10px] text-emerald-800/80 dark:text-emerald-300/80">
+                      Level {selectedStudent.puzzleLevels || 1} Solved · {selectedStudent.puzzleMoves || 0} Moves
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-lg border border-emerald-500/30">
+                    +{selectedStudent.puzzleBonus} PTS
+                  </span>
+                  <span className="block text-[10px] text-muted-foreground mt-0.5">⚡ {selectedStudent.puzzleTimeSeconds}s</span>
+                </div>
+              </div>
+            ) : null}
+
             {/* Tournament Summary */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-3 bg-card border border-border rounded-xl">
                 <span className="text-[11px] text-muted-foreground uppercase block font-semibold">Total Points</span>
                 <strong className="text-lg font-bold text-primary">{selectedStudent.totalPoints}</strong>
+                {selectedStudent.puzzleBonus ? (
+                  <span className="text-[10px] block font-bold text-emerald-600 dark:text-emerald-400">
+                    ({selectedStudent.quizPoints ?? (selectedStudent.totalPoints - selectedStudent.puzzleBonus)} quiz + {selectedStudent.puzzleBonus} puzzle)
+                  </span>
+                ) : null}
               </div>
               <div className="p-3 bg-card border border-border rounded-xl">
                 <span className="text-[11px] text-muted-foreground uppercase block font-semibold">Total Time</span>

@@ -392,8 +392,8 @@ export async function getScoresFromMongo(day?: number, isAdmin: boolean = false)
       const maxPts = rDay === 10 ? 100 : 30;
       const maxFirstTry = rDay === 10 ? 10 : 3;
 
-      // Auto-heal verified scores if answers array is present:
-      if (Array.isArray(r.answers) && r.answers.length > 0) {
+      // Auto-heal verified scores if answers array is present (unless manually edited by admin):
+      if (!r.adminEdited && Array.isArray(r.answers) && r.answers.length > 0) {
         const verifiedCorrect = r.answers.filter((a: any) => a.isCorrect).length;
         const verifiedPoints = verifiedCorrect * 10;
         if (r.points !== verifiedPoints || r.firstTryCount !== verifiedCorrect) {
@@ -736,18 +736,35 @@ export async function updateScoreInMongo(params: {
     const filter: any = {};
     if (params.id) {
       filter.$or = [{ id: params.id }, { _id: params.id }];
-    } else if (params.username) {
-      const esc = params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.username = { $regex: new RegExp(`^${esc}$`, 'i') };
+    } else {
+      const userOr: any[] = [];
+      const cleanRoll = (params.rollNo || '').trim().toUpperCase();
+      if (cleanRoll && cleanRoll !== '-' && cleanRoll !== 'N/A') {
+        userOr.push({ rollNo: cleanRoll });
+      }
+      if (params.username) {
+        const esc = params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        userOr.push({ username: { $regex: new RegExp(`^${esc}$`, 'i') } });
+      }
+      if (params.fullName) {
+        const escFull = params.fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        userOr.push({ fullName: { $regex: new RegExp(`^${escFull}$`, 'i') } });
+      }
+      if (userOr.length > 0) {
+        filter.$or = userOr;
+      }
       if (params.day) filter.day = Number(params.day);
     }
 
     let existing = await leaderboardCol.findOne(filter);
-    if (!existing && params.username && params.day) {
-      const esc = params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!existing && (params.username || params.fullName) && params.day) {
+      const esc = (params.username || params.fullName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const userProfile =
         (await leaderboardCol.findOne({
-          username: { $regex: new RegExp(`^${esc}$`, 'i') },
+          $or: [
+            { username: { $regex: new RegExp(`^${esc}$`, 'i') } },
+            { fullName: { $regex: new RegExp(`^${esc}$`, 'i') } }
+          ]
         })) ||
         (await usersCol.findOne({
           username: { $regex: new RegExp(`^${esc}$`, 'i') },
@@ -757,8 +774,8 @@ export async function updateScoreInMongo(params: {
       const newEntryId = params.id || `entry-admin-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const newRecord: any = {
         id: newEntryId,
-        username: params.username.trim(),
-        fullName: params.fullName?.trim() || userProfile?.fullName || params.username.trim(),
+        username: (params.username || params.fullName || 'Student').trim(),
+        fullName: params.fullName?.trim() || userProfile?.fullName || params.username?.trim(),
         course: params.course?.trim() || userProfile?.course || '',
         year: params.year?.trim() || userProfile?.year || '',
         batch: params.batch !== undefined ? params.batch.trim() : (userProfile?.batch || ''),
@@ -778,6 +795,7 @@ export async function updateScoreInMongo(params: {
         submittedAt: new Date().toISOString(),
         createdAt: new Date(),
         updatedAt: new Date(),
+        adminEdited: true,
         answers: [],
       };
       await leaderboardCol.insertOne(newRecord);
@@ -788,6 +806,7 @@ export async function updateScoreInMongo(params: {
 
     const updateFields: any = {
       updatedAt: new Date(),
+      adminEdited: true,
     };
     if (typeof params.points === 'number') updateFields.points = Number(params.points);
     if (typeof params.timeSeconds === 'number') updateFields.timeSeconds = Number(params.timeSeconds);
