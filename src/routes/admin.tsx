@@ -36,7 +36,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RankBadge } from '@/components/rank-badge';
 import { DAILY_QUIZZES, type DailyQuiz, type Question } from '@/data/quiz';
 import {
   getAdminSession,
@@ -1374,7 +1373,6 @@ function AdminPage() {
               <table className="w-full text-left border-collapse text-xs md:text-sm">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                    <th className="py-3 px-3 text-center w-14">Rank</th>
                     <th className="py-3 px-4">Student / User</th>
                     <th className="py-3 px-4">Course</th>
                     <th className="py-3 px-4">Semester &amp; Batch</th>
@@ -1391,10 +1389,6 @@ function AdminPage() {
                       onClick={() => setSelectedStudent(st)}
                       className="cursor-pointer transition-colors hover:bg-muted/40"
                     >
-                      <td className="py-3 px-3 text-center">
-                        <RankBadge rank={idx + 1} size="sm" />
-                      </td>
-
                       <td className="py-3 px-4 font-semibold text-foreground">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
@@ -1502,15 +1496,9 @@ function AdminPage() {
                   {selectedStudent.username.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-foreground">
-                      {selectedStudent.fullName || selectedStudent.username}
-                    </h3>
-                    <RankBadge
-                      rank={Math.max(1, participants.findIndex(p => p.username === selectedStudent.username) + 1)}
-                      size="sm"
-                    />
-                  </div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {selectedStudent.fullName || selectedStudent.username}
+                  </h3>
                   <p className="text-xs text-muted-foreground font-mono">@{selectedStudent.username}</p>
                 </div>
               </div>
