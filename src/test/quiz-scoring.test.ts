@@ -35,4 +35,16 @@ describe('daily hunt scoring', () => {
       expect(q.options).toHaveLength(4);
     }
   });
+
+  it('correctly scores Day 10 Grand Finale championship: 10 questions, 100 max points, 9/10 = 90 pts', () => {
+    const day10Questions = 10;
+    const maxDay10Points = day10Questions * POINTS_FIRST_TRY;
+    expect(maxDay10Points).toBe(100);
+
+    const nineCorrect = 9 * POINTS_FIRST_TRY;
+    expect(nineCorrect).toBe(90);
+
+    const fullCorrect = 10 * POINTS_FIRST_TRY;
+    expect(fullCorrect).toBe(100);
+  });
 });

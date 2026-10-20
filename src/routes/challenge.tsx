@@ -848,7 +848,7 @@ function Quiz() {
                 fullName={userProfile?.fullName || playerName}
                 course={userProfile?.course || course}
                 year={userProfile?.year || year}
-                tier={points >= maxPoints ? 'Herstory Champion' : points >= 20 ? 'Curiosity Star' : 'Brave Explorer'}
+                tier={points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer'}
               />
             )}
           </div>
@@ -858,7 +858,7 @@ function Quiz() {
   }
 
   if (done) {
-    const tier = points >= maxPoints ? 'Herstory Champion' : points >= 20 ? 'Curiosity Star' : 'Brave Explorer';
+    const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
     return (
       <main className="wrap section">
         <div className="quiz">

@@ -384,17 +384,45 @@ export async function getScoresFromMongo(day?: number, isAdmin: boolean = false)
 
     const uniqueFirstAttempts = Array.from(firstAttemptMap.values());
 
-    // 3b. Sanitize scores that have points > 30 (remove streak bonus) and clamp firstTryCount
+    // 3b. Sanitize scores and auto-heal verified answer scores:
+    // Days 1-9: max points 30, max firstTryCount 3 (removes legacy streak bonus)
+    // Day 10 (Grand Finale): max points 100, max firstTryCount 10
     for (const r of uniqueFirstAttempts) {
-      if (r.points > 30) {
-        r.points = 30;
+      const rDay = Number(r.day);
+      const maxPts = rDay === 10 ? 100 : 30;
+      const maxFirstTry = rDay === 10 ? 10 : 3;
+
+      // Auto-heal verified scores if answers array is present:
+      if (Array.isArray(r.answers) && r.answers.length > 0) {
+        const verifiedCorrect = r.answers.filter((a: any) => a.isCorrect).length;
+        const verifiedPoints = verifiedCorrect * 10;
+        if (r.points !== verifiedPoints || r.firstTryCount !== verifiedCorrect) {
+          r.points = verifiedPoints;
+          r.firstTryCount = verifiedCorrect;
+          r.totalQuestions = r.answers.length;
+          collection.updateOne(
+            { _id: r._id },
+            {
+              $set: {
+                points: verifiedPoints,
+                firstTryCount: verifiedCorrect,
+                totalQuestions: r.answers.length,
+              },
+            }
+          ).catch(() => {});
+        }
       }
-      if (r.firstTryCount > 3) {
-        r.firstTryCount = 3;
+
+      if (rDay !== 10) {
+        if (r.points > 30) r.points = 30;
+        if (r.firstTryCount > 3) r.firstTryCount = 3;
+      } else {
+        if (r.points > 100) r.points = 100;
+        if (r.firstTryCount > 10) r.firstTryCount = 10;
       }
     }
-    collection.updateMany({ points: { $gt: 30 } }, { $set: { points: 30 } }).catch(() => {});
-    collection.updateMany({ firstTryCount: { $gt: 3 } }, { $set: { firstTryCount: 3 } }).catch(() => {});
+    collection.updateMany({ day: { $ne: 10 }, points: { $gt: 30 } }, { $set: { points: 30 } }).catch(() => {});
+    collection.updateMany({ day: { $ne: 10 }, firstTryCount: { $gt: 3 } }, { $set: { firstTryCount: 3 } }).catch(() => {});
 
     // 4. Sort official first attempts by leaderboard rules: Points DESC, Speed ASC
     uniqueFirstAttempts.sort((a, b) => {

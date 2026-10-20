@@ -227,10 +227,10 @@ function Leaderboard() {
     const totalQuestions = quiz.questions?.length || 3;
     const maxPoints = totalQuestions * 10;
     const dayScore = entry.dayBreakdown?.find((d: any) => d.day === targetDay);
-    const points = Math.min(dayScore?.points ?? entry.points ?? 30, maxPoints);
+    const points = Math.min(dayScore?.points ?? entry.points ?? maxPoints, maxPoints);
     const timeTaken = dayScore?.timeSeconds ?? entry.timeSeconds ?? entry.totalTimeSeconds ?? 0;
-    const firstTryCount = Math.min(dayScore?.firstTryCount ?? entry.firstTryCount ?? 3, totalQuestions);
-    const tier = points >= maxPoints ? 'Herstory Champion' : points >= 20 ? 'Curiosity Star' : 'Brave Explorer';
+    const firstTryCount = Math.min(dayScore?.firstTryCount ?? entry.firstTryCount ?? totalQuestions, totalQuestions);
+    const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
 
     setShareCardData({
       day: targetDay,

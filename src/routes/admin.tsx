@@ -1933,17 +1933,23 @@ function AdminPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="edit-firsttry" className="text-xs font-bold text-muted-foreground">Attempts (1-3)</Label>
+                    <Label htmlFor="edit-firsttry" className="text-xs font-bold text-muted-foreground">
+                      Accuracy ({editingStudent.firstTryCount}/{editingStudent.day === 10 ? 10 : 3})
+                    </Label>
                     <select
                       id="edit-firsttry"
                       value={editingStudent.firstTryCount}
                       onChange={e => setEditingStudent({ ...editingStudent, firstTryCount: Number(e.target.value) })}
                       className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs h-9 font-mono"
                     >
-                      <option value="3">3/3</option>
-                      <option value="2">2/3</option>
-                      <option value="1">1/3</option>
-                      <option value="0">0/3</option>
+                      {Array.from(
+                        { length: (editingStudent.day === 10 ? 10 : 3) + 1 },
+                        (_, i) => (editingStudent.day === 10 ? 10 : 3) - i
+                      ).map(n => (
+                        <option key={n} value={n}>
+                          {n}/{editingStudent.day === 10 ? 10 : 3}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
