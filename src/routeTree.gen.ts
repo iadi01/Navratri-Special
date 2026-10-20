@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as CardsRouteImport } from './routes/cards'
 import { Route as ChallengeRouteImport } from './routes/challenge'
 import { Route as HeroinesRouteImport } from './routes/heroines'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CardsRoute = CardsRouteImport.update({
+  id: '/cards',
+  path: '/cards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChallengeRoute = ChallengeRouteImport.update({
@@ -50,6 +56,7 @@ const PuzzleRoute = PuzzleRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/cards': typeof CardsRoute
   '/challenge': typeof ChallengeRoute
   '/heroines': typeof HeroinesRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/cards': typeof CardsRoute
   '/challenge': typeof ChallengeRoute
   '/heroines': typeof HeroinesRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/cards': typeof CardsRoute
   '/challenge': typeof ChallengeRoute
   '/heroines': typeof HeroinesRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -75,13 +84,27 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/admin' | '/challenge' | '/heroines' | '/leaderboard' | '/puzzle'
+    | '/'
+    | '/admin'
+    | '/cards'
+    | '/challenge'
+    | '/heroines'
+    | '/leaderboard'
+    | '/puzzle'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/challenge' | '/heroines' | '/leaderboard' | '/puzzle'
+  to:
+    | '/'
+    | '/admin'
+    | '/cards'
+    | '/challenge'
+    | '/heroines'
+    | '/leaderboard'
+    | '/puzzle'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/cards'
     | '/challenge'
     | '/heroines'
     | '/leaderboard'
@@ -91,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  CardsRoute: typeof CardsRoute
   ChallengeRoute: typeof ChallengeRoute
   HeroinesRoute: typeof HeroinesRoute
   LeaderboardRoute: typeof LeaderboardRoute
@@ -111,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cards': {
+      id: '/cards'
+      path: '/cards'
+      fullPath: '/cards'
+      preLoaderRoute: typeof CardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/challenge': {
@@ -147,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  CardsRoute: CardsRoute,
   ChallengeRoute: ChallengeRoute,
   HeroinesRoute: HeroinesRoute,
   LeaderboardRoute: LeaderboardRoute,

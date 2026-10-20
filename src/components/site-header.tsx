@@ -87,6 +87,12 @@ export function SiteHeader() {
         <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
           <Link to="/leaderboard">Leaderboard</Link>
         </Button>
+        <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3">
+          <Link to="/cards">
+            <span className="hidden sm:inline">Share Cards</span>
+            <span className="sm:hidden">Cards</span>
+          </Link>
+        </Button>
         {isPuzzleEnabled && (
           <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm px-2.5 sm:px-3 text-pink-700 font-bold hover:text-pink-800">
             <Link to="/puzzle">

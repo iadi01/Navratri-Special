@@ -124,7 +124,7 @@ function StayTunedAnnouncement({
       </div>
 
       {/* Action Buttons */}
-      <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+      <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
         <Button
           asChild
           className="w-full sm:w-auto font-black text-xs sm:text-sm h-11 px-6 rounded-2xl bg-[#B82348] hover:bg-[#961c3b] text-white border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer"
@@ -141,6 +141,16 @@ function StayTunedAnnouncement({
         >
           <Link to="/challenge">
             Play Daily Challenge ⚡
+          </Link>
+        </Button>
+
+        <Button
+          asChild
+          variant="outline"
+          className="w-full sm:w-auto font-bold text-xs sm:text-sm h-11 px-6 rounded-2xl border-2 border-[#1C332E] bg-[#FBF0C8] hover:bg-[#fde047] text-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer"
+        >
+          <Link to="/cards">
+            🏆 Share Cards Studio
           </Link>
         </Button>
       </div>
@@ -405,6 +415,15 @@ function Leaderboard() {
             <span className="hidden sm:inline">Day-wise Standings</span>
             <span className="sm:hidden">Day-wise</span>
           </button>
+
+          <Link
+            to="/cards"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer text-muted-foreground hover:text-foreground hover:bg-background/80"
+          >
+            <Sparkles size={14} className="shrink-0 text-amber-500" />
+            <span className="hidden sm:inline">Share Cards Studio</span>
+            <span className="sm:hidden">Cards</span>
+          </Link>
         </div>
       </div>
 
