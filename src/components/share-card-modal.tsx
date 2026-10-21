@@ -1453,8 +1453,8 @@ export function ShareCardModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in">
-      <div className="relative w-full max-w-xl bg-[var(--background)] border-2 border-[var(--foreground)] rounded-3xl shadow-[8px_8px_0_var(--foreground)] p-4 sm:p-6 flex flex-col max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2.5 sm:p-5 backdrop-blur-xs animate-in fade-in">
+      <div className="relative w-full max-w-xl bg-[var(--background)] border-2 border-[var(--foreground)] rounded-3xl shadow-[8px_8px_0_var(--foreground)] p-3.5 sm:p-6 flex flex-col max-h-[92dvh] sm:max-h-[92vh] overflow-y-auto overscroll-contain">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b-2 border-[var(--border)] shrink-0">
           <div>
@@ -1478,15 +1478,15 @@ export function ShareCardModal({
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Card Image Preview */}
-        <div className="my-4 rounded-2xl overflow-hidden border-2 border-[var(--foreground)] shadow-[4px_5px_0_var(--foreground)] bg-white relative shrink-0">
+        <div className="my-3 sm:my-4 rounded-2xl overflow-hidden border-2 border-[var(--foreground)] shadow-[4px_5px_0_var(--foreground)] bg-white relative shrink-0">
           {dataUrl ? (
             <img
               src={dataUrl}
               alt="Pehchaan Kaun Scorecard"
-              className="w-full h-auto object-contain max-h-[38vh] sm:max-h-[48vh] mx-auto block"
+              className="w-full h-auto object-contain max-h-[32dvh] sm:max-h-[46vh] mx-auto block"
             />
           ) : (
-            <div className="h-44 sm:h-56 flex items-center justify-center text-xs font-bold text-muted-foreground">
+            <div className="h-40 sm:h-56 flex items-center justify-center text-xs font-bold text-muted-foreground">
               Drawing your custom rosette scorecard...
             </div>
           )}
@@ -1500,7 +1500,7 @@ export function ShareCardModal({
         )}
 
         {/* Quick Instructions */}
-        <div className="bg-[var(--butter)]/60 border border-[var(--border)] rounded-xl p-3 text-[11px] text-[var(--foreground)] space-y-1 mb-3 shrink-0">
+        <div className="bg-[var(--butter)]/60 border border-[var(--border)] rounded-xl p-2.5 sm:p-3 text-[11px] text-[var(--foreground)] space-y-1 mb-3 shrink-0">
           <p className="font-black text-xs text-[var(--foreground)] flex items-center gap-1.5">
             <span>✨</span> How to post on BeSocial:
           </p>
@@ -1513,7 +1513,7 @@ export function ShareCardModal({
         <div className="mt-auto space-y-2 pt-2 border-t-2 border-[var(--border)] shrink-0">
           <Button
             size="lg"
-            className="w-full gap-2 font-black text-xs sm:text-sm h-12 bg-primary text-primary-foreground border-2 border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] rounded-2xl hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] hover:bg-primary/95 transition-all cursor-pointer"
+            className="w-full gap-2 font-black text-xs sm:text-sm h-11 sm:h-12 bg-primary text-primary-foreground border-2 border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] rounded-2xl hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--foreground)] hover:bg-primary/95 transition-all cursor-pointer"
             onClick={handleShareToBeSocial}
           >
             <Share2 size={16} /> <span>Share to BeSocial (1-Click)</span> <ExternalLink size={14} className="opacity-80" />
@@ -1523,24 +1523,24 @@ export function ShareCardModal({
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 text-xs h-10 font-bold border-2 border-[var(--foreground)] bg-white shadow-[2px_2px_0_var(--foreground)] rounded-xl hover:bg-[var(--butter)] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer"
+              className="gap-1.5 text-xs h-10 font-bold border-2 border-[var(--foreground)] bg-white shadow-[2px_2px_0_var(--foreground)] rounded-xl hover:bg-[var(--butter)] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer px-2"
               onClick={downloadCardImage}
             >
-              <Download size={14} /> Download PNG
+              <Download size={14} className="shrink-0" /> <span className="truncate">Download PNG</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 text-xs h-10 font-bold border-2 border-[var(--foreground)] bg-white shadow-[2px_2px_0_var(--foreground)] rounded-xl hover:bg-[var(--butter)] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer"
+              className="gap-1.5 text-xs h-10 font-bold border-2 border-[var(--foreground)] bg-white shadow-[2px_2px_0_var(--foreground)] rounded-xl hover:bg-[var(--butter)] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer px-2"
               onClick={copyTextCaption}
             >
               {copiedText ? (
                 <>
-                  <Check size={14} className="text-emerald-600" /> Caption Copied!
+                  <Check size={14} className="text-emerald-600 shrink-0" /> <span className="truncate">Caption Copied!</span>
                 </>
               ) : (
                 <>
-                  <Copy size={14} /> Copy Caption
+                  <Copy size={14} className="shrink-0" /> <span className="truncate">Copy Caption</span>
                 </>
               )}
             </Button>

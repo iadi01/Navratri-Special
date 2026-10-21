@@ -480,8 +480,8 @@ export function PuzzleShareModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-5 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white border-4 border-[#1C332E] rounded-3xl shadow-[8px_8px_0px_#B82348] p-4 sm:p-6 flex flex-col max-h-[92vh] overflow-y-auto space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2.5 sm:p-5 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-white border-4 border-[#1C332E] rounded-3xl shadow-[8px_8px_0px_#B82348] p-3.5 sm:p-6 flex flex-col max-h-[92dvh] sm:max-h-[92vh] overflow-y-auto overscroll-contain space-y-3 sm:space-y-4">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -496,7 +496,7 @@ export function PuzzleShareModal({
           <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-pink-100 border-2 border-[#1C332E] text-pink-700 font-bold text-xs shadow-[2px_2px_0px_#1C332E]">
             <Sparkles size={12} /> 4:5 BeSocial Scorecard
           </div>
-          <h2 className="text-2xl font-extrabold text-[#1C332E] font-['Baloo_2']">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-[#1C332E] font-['Baloo_2']">
             Share Your Puzzle Victory! 🏆
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -508,7 +508,7 @@ export function PuzzleShareModal({
         <canvas ref={canvasRef} className="hidden" />
 
         {/* 4:5 Scorecard Visual Preview */}
-        <div className="relative mx-auto w-full max-w-[320px] aspect-[4/5] rounded-2xl overflow-hidden border-3 border-[#1C332E] shadow-[5px_5px_0px_#1C332E] bg-muted/20 flex items-center justify-center">
+        <div className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] aspect-[4/5] rounded-2xl overflow-hidden border-3 border-[#1C332E] shadow-[5px_5px_0px_#1C332E] bg-muted/20 flex items-center justify-center">
           {dataUrl ? (
             <img
               src={dataUrl}

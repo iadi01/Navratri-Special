@@ -672,7 +672,7 @@ function Leaderboard() {
                 onClick={() => {
                   handleOpenShare(currentUserOverallEntry, userOverallRank || 1);
                 }}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95 w-full sm:w-auto"
               >
                 <Share2 size={12} className="text-primary shrink-0" />
                 <span>Share My Overall Scorecard</span>
@@ -1093,7 +1093,7 @@ function Leaderboard() {
                   };
                   handleOpenShare(entryToShare, userDayRank || 1, selectedDay);
                 }}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95 w-full sm:w-auto"
               >
                 <Share2 size={12} className="text-primary shrink-0" />
                 <span>Share My Scorecard</span>
@@ -1275,25 +1275,25 @@ function Leaderboard() {
       {/* 🎓 USER PROFILE DETAIL MODAL (PROMINENT & SOFT HARMONIOUS DESIGN) */}
       {/* ========================================================================= */}
       {selectedUserDetail && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-card text-card-foreground border-2 border-border rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4">
+          <div className="bg-card text-card-foreground border-2 border-border rounded-3xl max-w-md w-full p-3.5 sm:p-6 shadow-xl space-y-3.5 sm:space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[92dvh] sm:max-h-[92vh] overflow-y-auto overscroll-contain">
             {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-border pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary text-xl font-black flex items-center justify-center border border-primary/30">
+            <div className="flex items-start justify-between border-b border-border pb-3 sm:pb-4">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-primary/15 text-primary text-lg sm:text-xl font-black flex items-center justify-center border border-primary/30 shrink-0">
                   {selectedUserDetail.username.slice(0, 1).toUpperCase()}
                 </div>
-                <div>
-                  <h3 className="text-lg font-black text-foreground">
+                <div className="min-w-0">
+                  <h3 className="text-base sm:text-lg font-black text-foreground truncate">
                     {selectedUserDetail.fullName || selectedUserDetail.username}
                   </h3>
-                  <p className="text-xs text-muted-foreground font-mono font-bold">@{selectedUserDetail.username}</p>
+                  <p className="text-xs text-muted-foreground font-mono font-bold truncate">@{selectedUserDetail.username}</p>
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 rounded-full hover:bg-muted"
+                className="h-8 w-8 p-0 rounded-full hover:bg-muted shrink-0 cursor-pointer"
                 onClick={() => setSelectedUserDetail(null)}
               >
                 <X size={18} />
@@ -1301,55 +1301,55 @@ function Leaderboard() {
             </div>
 
             {/* Academic Information Box */}
-            <div className="bg-muted/60 rounded-2xl p-4 border border-border space-y-2">
+            <div className="bg-muted/60 rounded-2xl p-3 sm:p-4 border border-border space-y-2">
               <div className="text-xs font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
                 <GraduationCap size={15} /> Student Academic Information
               </div>
-              <div className="grid grid-cols-2 gap-3 pt-1 text-xs">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1 text-xs">
                 <div>
-                  <span className="text-muted-foreground font-semibold block text-[11px]">Course / Degree:</span>
-                  <strong className="text-foreground text-sm font-extrabold">{selectedUserDetail.course || 'Not specified'}</strong>
+                  <span className="text-muted-foreground font-semibold block text-[10px] sm:text-[11px]">Course / Degree:</span>
+                  <strong className="text-foreground text-xs sm:text-sm font-extrabold truncate block">{selectedUserDetail.course || 'Not specified'}</strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground font-semibold block text-[11px]">Semester:</span>
-                  <strong className="text-foreground text-sm font-extrabold">{selectedUserDetail.year || 'Not specified'}</strong>
+                  <span className="text-muted-foreground font-semibold block text-[10px] sm:text-[11px]">Semester:</span>
+                  <strong className="text-foreground text-xs sm:text-sm font-extrabold truncate block">{selectedUserDetail.year || 'Not specified'}</strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground font-semibold block text-[11px]">Batch:</span>
-                  <strong className="text-foreground text-sm font-extrabold">{selectedUserDetail.batch || 'Not specified'}</strong>
+                  <span className="text-muted-foreground font-semibold block text-[10px] sm:text-[11px]">Batch:</span>
+                  <strong className="text-foreground text-xs sm:text-sm font-extrabold truncate block">{selectedUserDetail.batch || 'Not specified'}</strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground font-semibold block text-[11px]">Roll No / Student ID:</span>
-                  <strong className="text-foreground text-sm font-mono font-extrabold">{selectedUserDetail.rollNo || '-'}</strong>
+                  <span className="text-muted-foreground font-semibold block text-[10px] sm:text-[11px]">Roll No / Student ID:</span>
+                  <strong className="text-foreground text-xs sm:text-sm font-mono font-extrabold truncate block">{selectedUserDetail.rollNo || '-'}</strong>
                 </div>
               </div>
             </div>
 
             {/* Score, Rank & Speed Prominent Badges */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
-              <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex flex-col justify-center">
-                <span className="text-[10px] sm:text-[11px] text-amber-700 dark:text-amber-400 uppercase block font-black">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3 text-center">
+              <div className="p-2 sm:p-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex flex-col justify-center">
+                <span className="text-[9px] sm:text-[11px] text-amber-700 dark:text-amber-400 uppercase block font-black">
                   Rank
                 </span>
-                <strong className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-300">
+                <strong className="text-lg sm:text-2xl font-black text-amber-700 dark:text-amber-300">
                   #{selectedUserRank}
                 </strong>
               </div>
-              <div className="p-3 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col justify-center">
-                <span className="text-[10px] sm:text-[11px] text-primary uppercase block font-black">
+              <div className="p-2 sm:p-3 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col justify-center">
+                <span className="text-[9px] sm:text-[11px] text-primary uppercase block font-black">
                   Total Score
                 </span>
-                <strong className="text-xl sm:text-2xl font-black text-primary">
+                <strong className="text-base sm:text-2xl font-black text-primary truncate">
                   {'totalPoints' in selectedUserDetail
                     ? `${selectedUserDetail.totalPoints}/${overallMaxScore}`
                     : `${selectedUserDetail.points}/${(selectedUserDetail as any).day === 10 ? 100 : 30}`}
                 </strong>
               </div>
-              <div className="p-3 bg-secondary border border-secondary-foreground/20 rounded-2xl flex flex-col justify-center">
-                <span className="text-[10px] sm:text-[11px] text-secondary-foreground uppercase block font-black">
+              <div className="p-2 sm:p-3 bg-secondary border border-secondary-foreground/20 rounded-2xl flex flex-col justify-center">
+                <span className="text-[9px] sm:text-[11px] text-secondary-foreground uppercase block font-black">
                   Speed Record
                 </span>
-                <strong className="text-xl sm:text-2xl font-black text-secondary-foreground font-mono">
+                <strong className="text-base sm:text-2xl font-black text-secondary-foreground font-mono truncate">
                   {'totalTimeSeconds' in selectedUserDetail ? selectedUserDetail.totalTimeSeconds : selectedUserDetail.timeSeconds}s
                 </strong>
               </div>

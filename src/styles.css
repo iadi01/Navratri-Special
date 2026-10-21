@@ -56,6 +56,8 @@ html, body {
   font-family: var(--font-sans);
   overflow-x: hidden;
   max-width: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 h1, h2, h3 {
@@ -1101,6 +1103,56 @@ button, a {
 
   .quiz-best-band strong {
     font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wrap {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .nav {
+    justify-content: flex-start;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .nav a, .nav button {
+    font-size: 11.5px;
+    padding: 5px 8px;
+    min-height: 36px;
+  }
+
+  .quiz-best-band {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .quiz-best-band button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .wrap {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  .header {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .brand {
+    font-size: 17px;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
   }
 }
 
