@@ -1185,30 +1185,30 @@ function AdminPage() {
           </div>
 
           {/* 🔒 LEADERBOARD SUSPENSE & FINAL REVEAL CONTROLLER */}
-          <div className="bg-card border-2 border-amber-500/40 rounded-xl p-5 md:p-6 shadow-sm bg-gradient-to-r from-amber-50/30 via-card to-card">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="bg-card border-2 border-amber-500/40 rounded-xl p-4 sm:p-5 shadow-sm bg-gradient-to-r from-amber-50/30 via-card to-card">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">🌸</span>
-                  <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
-                    Leaderboard Suspense Mode (Hide Day 8+ &amp; Final Reveal)
+                  <span className="text-lg">🌸</span>
+                  <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+                    Leaderboard Suspense Mode
                   </h2>
                   {leaderboardConfig.suspenseEnabled ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-                      <Lock size={11} /> SUSPENSE ACTIVE (Day {leaderboardConfig.hideFromDay}+ Hidden)
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                      <Lock size={10} /> SUSPENSE ON (Day {leaderboardConfig.hideFromDay}+)
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      <Unlock size={11} /> FULL LEADERBOARD VISIBLE
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <Unlock size={10} /> SUSPENSE OFF (ALL VISIBLE)
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Starting from Day {leaderboardConfig.hideFromDay}, all public rankings, scores, and winner details are hidden behind a celebratory <b>“Stay Tuned”</b> announcement so the grand championship winners remain a sacred suspense until the final reveal! Days 1 to {leaderboardConfig.hideFromDay - 1} remain public. Admins can always view all records.
+                <p className="text-xs text-muted-foreground">
+                  Hides Day {leaderboardConfig.hideFromDay}+ scores behind a “Stay Tuned” screen for finale suspense. Admins can always view all records.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant={leaderboardConfig.suspenseEnabled ? 'outline' : 'default'}
@@ -1222,27 +1222,27 @@ function AdminPage() {
                 >
                   {leaderboardConfig.suspenseEnabled ? (
                     <>
-                      <Unlock size={13} className="mr-1.5" /> Turn Suspense OFF (Reveal All)
+                      <Unlock size={12} className="mr-1" /> Turn Suspense OFF
                     </>
                   ) : (
                     <>
-                      <Lock size={13} className="mr-1.5" /> Turn Suspense ON (Hide Day 8+)
+                      <Lock size={12} className="mr-1" /> Turn Suspense ON
                     </>
                   )}
                 </Button>
 
-                <Button size="sm" variant="ghost" className="text-xs" asChild>
+                <Button size="sm" variant="ghost" className="text-xs h-8 px-2.5" asChild>
                   <Link to="/leaderboard">
-                    Open Leaderboard <ArrowRight size={12} className="ml-1" />
+                    Open Leaderboard <ArrowRight size={11} className="ml-1" />
                   </Link>
                 </Button>
               </div>
             </div>
 
             {/* Quick Day Selector for Suspense Rule */}
-            <div className="mt-4 pt-4 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mt-3 pt-3 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-foreground">Hide Public Leaderboard Starting From:</span>
+                <span className="text-xs font-bold text-foreground">Hide From:</span>
                 <div className="flex items-center gap-1.5">
                   {[7, 8, 9, 10].map((d) => (
                     <button
@@ -1250,7 +1250,7 @@ function AdminPage() {
                       type="button"
                       onClick={() => handleSetHideFromDay(d)}
                       disabled={isUpdatingLeaderboardConfig}
-                      className={`px-2.5 py-1 text-xs rounded-lg font-bold border transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 text-xs rounded-md font-bold border transition-all cursor-pointer ${
                         leaderboardConfig.hideFromDay === d
                           ? 'bg-[#B82348] text-white border-[#1C332E] shadow-xs'
                           : 'bg-muted/60 text-muted-foreground border-border hover:text-foreground'
@@ -1263,7 +1263,7 @@ function AdminPage() {
               </div>
 
               <div className="text-[11px] text-muted-foreground italic">
-                Announcement: “The celebration is not over yet. Stay tuned for the final reveal!”
+                Notice: “The celebration is not over yet. Stay tuned for the final reveal!”
               </div>
             </div>
           </div>
