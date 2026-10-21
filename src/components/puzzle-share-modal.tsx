@@ -61,7 +61,34 @@ export function PuzzleShareModal({
       : '/navratri-puzzle-art-0.jpg');
 
   // Share caption matching the leaderboard format cleanly
-  const shareCaption = `🏆 I scored ${pointsEarned} points (Level ${completedLevels}/3) in the Navratri Sliding Puzzle of "पहचानो कौन?" in ${totalTimeSeconds}s with ${totalMoves} moves${rank ? ` (Rank #${rank})` : ''}! 🌸\n\nCan you solve it faster with fewer moves? Test your speed on the festive puzzle: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
+  const puzzleRankHeading = rank
+    ? (rank === 1
+        ? '👑 Thrilled to secure 1st Rank (Puzzle Champion) in "पहचानो कौन?"! 🥇🌸'
+        : rank === 2
+        ? '🥈 Proud to secure 2nd Rank (Runner-Up) in the Navratri Puzzle of "पहचानो कौन?"! 🥈🌸'
+        : rank === 3
+        ? '🥉 Proud to secure 3rd Rank (Podium Finisher) in the Navratri Puzzle of "पहचानो कौन?"! 🥉🌸'
+        : rank <= 10
+        ? `🌟 Proud to secure Rank #${rank} (Top 10 Finalist) in the Navratri Puzzle of "पहचानो कौन?"! 🌟🌸`
+        : `🏅 Proud to secure Rank #${rank} in the Navratri Puzzle of "पहचानो कौन?"! 🌸`)
+    : '🧩 Completed the Navratri Special Sliding Puzzle of "पहचानो कौन?"! 🌸';
+
+  const puzzleStudentInfo = fullName?.trim()
+    ? `\n👤 Student: ${fullName.trim()} (${course || 'Amity Online'}${year ? ` • ${year}` : ''})`
+    : '';
+
+  const shareCaption = `${puzzleRankHeading}
+
+🏆 Achievement: Level ${completedLevels}/3 Solved
+🎯 Score: ${pointsEarned} points${rank ? `\n🏅 Rank: Rank #${rank}` : ''}
+⚡ Time: ${totalTimeSeconds}s
+🔄 Moves: ${totalMoves} moves${puzzleStudentInfo}
+
+Can you solve it faster with fewer moves? Test your speed on the festive puzzle:
+🔗 ${websiteUrl}
+
+@aahanasahay @singhsimrangopal22542
+#Navshakti #AmityOnline #PehchaanKaun #NavratriPuzzle #BeSocial`;
 
   // Draw 4:5 High-Resolution Scorecard Canvas (1080 x 1350)
   const drawCard = () => {
