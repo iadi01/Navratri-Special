@@ -176,7 +176,9 @@ function Leaderboard() {
     fullName: string;
     course?: string;
     year?: string;
+    batch?: string;
     tier: string;
+    puzzleBonus?: number;
   } | null>(null);
 
   // Active / open days currently enabled by admin
@@ -217,7 +219,9 @@ function Leaderboard() {
         fullName: entry.fullName || entry.username || 'Explorer',
         course: entry.course || 'BCA',
         year: entry.year || '1st Sem',
+        batch: entry.batch,
         tier,
+        puzzleBonus: entry.puzzleBonus,
       });
       return;
     }
@@ -244,7 +248,9 @@ function Leaderboard() {
       fullName: entry.fullName || entry.username || 'Explorer',
       course: entry.course || 'BCA',
       year: entry.year || '1st Sem',
+      batch: entry.batch,
       tier,
+      puzzleBonus: entry.puzzleBonus,
     });
   };
 

@@ -848,6 +848,7 @@ function Quiz() {
                 fullName={userProfile?.fullName || playerName}
                 course={userProfile?.course || course}
                 year={userProfile?.year || year}
+                batch={userProfile?.batch}
                 tier={points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer'}
               />
             )}
@@ -937,6 +938,7 @@ function Quiz() {
               fullName={userProfile?.fullName || playerName}
               course={userProfile?.course || course}
               year={userProfile?.year || year}
+              batch={userProfile?.batch}
               tier={tier}
             />
 
