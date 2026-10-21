@@ -203,9 +203,11 @@ export default {
         } catch (err: any) {
           return new Response(
             JSON.stringify({
+              leaderboardEnabled: true,
               hideFromDay: 8,
               suspenseEnabled: true,
               announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+              offlineMessage: 'The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.',
             }),
             { status: 200, headers: { 'content-type': 'application/json' } }
           );

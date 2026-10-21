@@ -410,18 +410,22 @@ export async function setAllDaysLive(days: number[]): Promise<number[]> {
 // =========================================================================
 
 export type LeaderboardConfig = {
+  leaderboardEnabled?: boolean;
   hideFromDay: number;
   suspenseEnabled: boolean;
   announcementMessage?: string;
+  offlineMessage?: string;
   updatedAt?: string;
 };
 
 const LEADERBOARD_CONFIG_KEY = 'pehchaan_leaderboard_config_v1';
 
 export const DEFAULT_LEADERBOARD_CONFIG: LeaderboardConfig = {
+  leaderboardEnabled: true,
   hideFromDay: 8,
   suspenseEnabled: true,
   announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+  offlineMessage: 'The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.',
 };
 
 export function getLeaderboardConfig(): LeaderboardConfig {
@@ -431,9 +435,11 @@ export function getLeaderboardConfig(): LeaderboardConfig {
     if (!raw) return DEFAULT_LEADERBOARD_CONFIG;
     const parsed = JSON.parse(raw);
     return {
+      leaderboardEnabled: parsed.leaderboardEnabled !== false,
       hideFromDay: typeof parsed.hideFromDay === 'number' ? parsed.hideFromDay : 8,
       suspenseEnabled: parsed.suspenseEnabled !== false,
       announcementMessage: parsed.announcementMessage || DEFAULT_LEADERBOARD_CONFIG.announcementMessage,
+      offlineMessage: parsed.offlineMessage || DEFAULT_LEADERBOARD_CONFIG.offlineMessage,
       updatedAt: parsed.updatedAt,
     };
   } catch {

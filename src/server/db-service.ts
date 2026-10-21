@@ -334,9 +334,12 @@ export async function getScoresFromMongo(day?: number, isAdmin: boolean = false)
       return [];
     }
 
-    // 🔒 Enforce Day 8+ leaderboard suspense on backend for public callers:
+    // 🔒 Enforce leaderboard enabled & Day 8+ leaderboard suspense on backend for public callers:
     if (!isAdmin) {
       const config = await getLeaderboardConfigFromMongo();
+      if (config.leaderboardEnabled === false) {
+        return [];
+      }
       if (config.suspenseEnabled && typeof config.hideFromDay === 'number') {
         if (day && day >= config.hideFromDay) {
           // Public request for a day in suspense: return empty array
@@ -453,9 +456,12 @@ export async function getScoresFromMongo(day?: number, isAdmin: boolean = false)
       answers: Array.isArray(r.answers) ? r.answers : undefined,
     }));
 
-    // If caller is public (non-admin) and suspense is enabled, redact Day >= hideFromDay in overall view as well
+    // If caller is public (non-admin), enforce leaderboardEnabled & suspense rules
     if (!isAdmin) {
       const config = await getLeaderboardConfigFromMongo();
+      if (config.leaderboardEnabled === false) {
+        return [];
+      }
       if (config.suspenseEnabled && typeof config.hideFromDay === 'number') {
         mapped = mapped.filter(e => e.day < config.hideFromDay);
       }
@@ -1424,9 +1430,11 @@ export async function deletePuzzleScoreInMongo(params: {
 // =========================================================================
 
 export type LeaderboardConfig = {
+  leaderboardEnabled?: boolean;
   hideFromDay: number;
   suspenseEnabled: boolean;
   announcementMessage?: string;
+  offlineMessage?: string;
   updatedAt?: string;
 };
 
@@ -1435,9 +1443,11 @@ export async function getLeaderboardConfigFromMongo(): Promise<LeaderboardConfig
     const { db, status } = await connectToDatabase();
     if (!db || !status.connected) {
       return {
+        leaderboardEnabled: true,
         hideFromDay: 8,
         suspenseEnabled: true,
         announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+        offlineMessage: 'The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.',
       };
     }
 
@@ -1445,22 +1455,28 @@ export async function getLeaderboardConfigFromMongo(): Promise<LeaderboardConfig
     const doc = await configCol.findOne({ key: 'leaderboard_config' });
     if (doc) {
       return {
+        leaderboardEnabled: doc.leaderboardEnabled !== false,
         hideFromDay: typeof doc.hideFromDay === 'number' ? doc.hideFromDay : 8,
         suspenseEnabled: doc.suspenseEnabled !== false,
         announcementMessage: doc.announcementMessage || 'The celebration is not over yet. Stay tuned for the final reveal!',
+        offlineMessage: doc.offlineMessage || 'The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.',
         updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : undefined,
       };
     }
     return {
+      leaderboardEnabled: true,
       hideFromDay: 8,
       suspenseEnabled: true,
       announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+      offlineMessage: 'The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.',
     };
   } catch (err) {
     return {
+      leaderboardEnabled: true,
       hideFromDay: 8,
       suspenseEnabled: true,
       announcementMessage: 'The celebration is not over yet. Stay tuned for the final reveal!',
+      offlineMessage: 'The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.',
     };
   }
 }
@@ -1477,9 +1493,11 @@ export async function saveLeaderboardConfigToMongo(config: Partial<LeaderboardCo
       key: 'leaderboard_config',
       updatedAt: new Date(),
     };
+    if (typeof config.leaderboardEnabled === 'boolean') updateDoc.leaderboardEnabled = config.leaderboardEnabled;
     if (typeof config.hideFromDay === 'number') updateDoc.hideFromDay = config.hideFromDay;
     if (typeof config.suspenseEnabled === 'boolean') updateDoc.suspenseEnabled = config.suspenseEnabled;
     if (config.announcementMessage) updateDoc.announcementMessage = config.announcementMessage;
+    if (config.offlineMessage) updateDoc.offlineMessage = config.offlineMessage;
 
     await configCol.updateOne(
       { key: 'leaderboard_config' },

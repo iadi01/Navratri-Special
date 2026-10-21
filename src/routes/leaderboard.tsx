@@ -18,6 +18,7 @@ import {
   Share2,
   Sparkles,
   Lock,
+  Unlock,
   Flower2,
 } from 'lucide-react';
 import { ShareCardModal } from '@/components/share-card-modal';
@@ -38,6 +39,8 @@ import {
   syncLiveDaysWithServer,
   getLeaderboardConfig,
   syncLeaderboardConfigWithServer,
+  updateLeaderboardConfig,
+  getAdminSession,
   type LeaderboardConfig,
 } from '@/lib/admin-store';
 
@@ -140,6 +143,94 @@ function StayTunedAnnouncement({
         >
           <Link to="/challenge">
             Play Daily Challenge ⚡
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// 🔒 Festive "Leaderboard Offline" Announcement Component (When Admin Turns Leaderboard OFF)
+function LeaderboardOfflineAnnouncement({
+  message,
+}: {
+  message?: string;
+}) {
+  return (
+    <div className="relative bg-[#FFF7F8] border-4 border-[#1C332E] rounded-3xl p-6 sm:p-10 md:p-12 shadow-[8px_8px_0px_#B82348] text-center max-w-3xl mx-auto my-8 sm:my-12 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+      {/* Decorative Washi Tape Top Tab */}
+      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#FBF0C8] border-2 border-[#1C332E] px-6 py-1 rounded-sm shadow-[2px_2px_0px_#1C332E] text-xs font-black uppercase tracking-widest text-[#1C332E] rotate-[-1deg]">
+        🌸 SHUBH NAVRATRI · NOTICE 🌸
+      </div>
+
+      {/* Floating Floral & Diya Icons */}
+      <div className="flex items-center justify-center gap-3 pt-2">
+        <span className="text-3xl animate-bounce">🪔</span>
+        <div className="w-14 h-14 rounded-full bg-[#FCE7F0] border-2 border-[#1C332E] flex items-center justify-center text-[#B82348] shadow-[3px_3px_0px_#1C332E]">
+          <Lock size={26} />
+        </div>
+        <span className="text-3xl animate-bounce delay-150">🌺</span>
+      </div>
+
+      {/* Eyebrow badge */}
+      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-100 border-2 border-[#1C332E] text-rose-950 text-xs font-extrabold tracking-wider shadow-[2px_2px_0px_#1C332E]">
+        <Lock size={14} className="text-[#B82348]" />
+        LEADERBOARD CURRENTLY OFFLINE
+      </div>
+
+      {/* Headline */}
+      <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#1C332E] font-['Baloo_2'] tracking-tight">
+        Leaderboard Paused
+      </h2>
+
+      {/* Main Required Announcement Message */}
+      <div className="bg-white border-2 border-[#1C332E] rounded-2xl p-5 sm:p-6 max-w-xl mx-auto shadow-[4px_4px_0px_#1C332E]">
+        <p className="text-base sm:text-lg font-bold text-[#B82348] leading-relaxed">
+          “{message || 'The leaderboard has been temporarily turned off by the administration. All participant scores and attempts are safely recorded in our database.'}”
+        </p>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-3 leading-relaxed">
+          Please check back soon for tournament standings. If you have played quizzes today, your scores and records remain safely stored in the database.
+        </p>
+      </div>
+
+      {/* Subtle festive note */}
+      <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-muted-foreground pt-2">
+        <span className="flex items-center gap-1.5">
+          <CheckCircle2 size={14} className="text-emerald-600" /> All attempts &amp; scores safely recorded in database
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Star size={14} className="text-amber-500 fill-amber-500" /> Standings will be visible when re-opened
+        </span>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+        <Button
+          asChild
+          className="w-full sm:w-auto font-black text-xs sm:text-sm h-11 px-6 rounded-2xl bg-[#B82348] hover:bg-[#961c3b] text-white border-2 border-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer"
+        >
+          <Link to="/challenge">
+            Play Daily Challenge ⚡
+          </Link>
+        </Button>
+
+        <Button
+          asChild
+          variant="outline"
+          className="w-full sm:w-auto font-bold text-xs sm:text-sm h-11 px-6 rounded-2xl border-2 border-[#1C332E] bg-white hover:bg-[#FCE7F0] text-[#1C332E] shadow-[3px_3px_0px_#1C332E] cursor-pointer"
+        >
+          <Link to="/heroines">
+            Explore Heroines 🌸
+          </Link>
+        </Button>
+
+        <Button
+          asChild
+          variant="ghost"
+          className="w-full sm:w-auto font-bold text-xs sm:text-sm h-11 px-4 text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          <Link to="/">
+            Back to Home 🏠
           </Link>
         </Button>
       </div>
@@ -381,8 +472,42 @@ function Leaderboard() {
 
   const currentQuiz = DAILY_QUIZZES.find(q => q.day === selectedDay) || DAILY_QUIZZES[0];
 
+  const isAdmin = typeof window !== 'undefined' && getAdminSession().isAuthenticated;
+
+  // 🔒 If Leaderboard is globally turned OFF by admin:
+  // Non-admins see the festive LeaderboardOfflineAnnouncement
+  if (leaderboardConfig.leaderboardEnabled === false && !isAdmin) {
+    return (
+      <main className="wrap section pb-16">
+        <LeaderboardOfflineAnnouncement message={leaderboardConfig.offlineMessage} />
+      </main>
+    );
+  }
+
   return (
     <main className="wrap section pb-16">
+      {/* Admin Preview Mode Alert (Shown only when leaderboard is turned off for public) */}
+      {leaderboardConfig.leaderboardEnabled === false && (
+        <div className="max-w-4xl mx-auto mb-6 bg-amber-500/15 border-2 border-amber-600 text-amber-950 dark:text-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <Lock className="text-amber-600 shrink-0" size={20} />
+            <div>
+              <p className="font-extrabold text-sm">Admin Preview Mode: Leaderboard is currently turned OFF for the public</p>
+              <p className="text-xs text-muted-foreground">Public students cannot see this page. You are viewing it because you are signed in as an administrator.</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 cursor-pointer"
+            onClick={async () => {
+              const updated = await updateLeaderboardConfig({ leaderboardEnabled: true });
+              setLeaderboardConfig(updated);
+            }}
+          >
+            <Unlock size={14} className="mr-1.5" /> Turn Leaderboard ON
+          </Button>
+        </div>
+      )}
       {/* Header */}
       <div className="text-center max-w-2xl mx-auto mb-8">
         <div className="eyebrow mb-2">

@@ -215,6 +215,10 @@ function AdminPage() {
 
   const [leaderboardConfig, setLeaderboardConfig] = useState<LeaderboardConfig>(() => getLeaderboardConfig());
   const [isUpdatingLeaderboardConfig, setIsUpdatingLeaderboardConfig] = useState<boolean>(false);
+  const [offlineMessageInput, setOfflineMessageInput] = useState<string>(
+    () => leaderboardConfig.offlineMessage || ''
+  );
+  const [isSavingOfflineMsg, setIsSavingOfflineMsg] = useState(false);
 
   useEffect(() => {
     const s = getAdminSession();
@@ -224,7 +228,10 @@ function AdminPage() {
 
     // Fetch live days & puzzle status from server
     syncLiveDaysWithServer().then(days => setLiveDays(days));
-    syncLeaderboardConfigWithServer().then(cfg => setLeaderboardConfig(cfg));
+    syncLeaderboardConfigWithServer().then(cfg => {
+      setLeaderboardConfig(cfg);
+      if (cfg.offlineMessage) setOfflineMessageInput(cfg.offlineMessage);
+    });
     fetchPuzzleAdminData();
 
     if (s.isAuthenticated) {
@@ -238,7 +245,9 @@ function AdminPage() {
     const handleStorage = () => {
       setLiveDays(getLiveDays());
       setParticipants(getOverallLeaderboard());
-      setLeaderboardConfig(getLeaderboardConfig());
+      const cfg = getLeaderboardConfig();
+      setLeaderboardConfig(cfg);
+      if (cfg.offlineMessage) setOfflineMessageInput(cfg.offlineMessage);
     };
     window.addEventListener('pehchaan_live_days_changed', handleStorage);
     window.addEventListener('pehchaan_leaderboard_updated', handleStorage);
@@ -273,6 +282,32 @@ function AdminPage() {
       setLeaderboardConfig(updated);
     } finally {
       setIsUpdatingLeaderboardConfig(false);
+    }
+  };
+
+  const handleToggleLeaderboardGlobal = async () => {
+    setIsUpdatingLeaderboardConfig(true);
+    try {
+      const nextState = leaderboardConfig.leaderboardEnabled === false;
+      const updated = await updateLeaderboardConfig({
+        leaderboardEnabled: nextState,
+      });
+      setLeaderboardConfig(updated);
+    } finally {
+      setIsUpdatingLeaderboardConfig(false);
+    }
+  };
+
+  const handleSaveOfflineMessage = async () => {
+    setIsSavingOfflineMsg(true);
+    try {
+      const updated = await updateLeaderboardConfig({
+        offlineMessage: offlineMessageInput.trim() || undefined,
+      });
+      setLeaderboardConfig(updated);
+      alert('Offline notice message saved successfully!');
+    } finally {
+      setIsSavingOfflineMsg(false);
     }
   };
 
@@ -657,11 +692,20 @@ function AdminPage() {
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/15 text-primary">
               <ShieldCheck size={12} /> Admin
             </span>
             <span className="text-xs text-muted-foreground">• Signed in as <b>@{session.user.username}</b></span>
+            {leaderboardConfig.leaderboardEnabled !== false ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> Leaderboard: ON
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/30">
+                <Lock size={10} /> Leaderboard: OFF
+              </span>
+            )}
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Admin Control Center</h1>
           <p className="text-sm text-muted-foreground">
@@ -1044,6 +1088,100 @@ function AdminPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* 🏆 GLOBAL LEADERBOARD MASTER CONTROLLER (PUBLIC ON / OFF) */}
+          <div className={`bg-card border-2 rounded-xl p-5 md:p-6 shadow-sm transition-all ${
+            leaderboardConfig.leaderboardEnabled !== false
+              ? 'border-emerald-500/40 bg-gradient-to-r from-emerald-50/30 via-card to-card'
+              : 'border-destructive/50 bg-gradient-to-r from-red-50/40 via-card to-card'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🏆</span>
+                  <h2 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                    Public Leaderboard Master Controller
+                  </h2>
+                  {leaderboardConfig.leaderboardEnabled !== false ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> ONLINE &amp; PUBLIC
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/30">
+                      <Lock size={11} /> TURNED OFF (OFFLINE FOR PUBLIC)
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {leaderboardConfig.leaderboardEnabled !== false
+                    ? 'The public leaderboard is currently ONLINE. All students can view overall standings, day rankings, and download their official BeSocial share cards.'
+                    : 'The public leaderboard is TURNED OFF. Public students will see a paused/maintenance notice. All attempts and scores remain safely stored in the database. Logged-in admins can still preview the full leaderboard.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Button
+                  size="sm"
+                  variant={leaderboardConfig.leaderboardEnabled !== false ? 'outline' : 'default'}
+                  onClick={handleToggleLeaderboardGlobal}
+                  disabled={isUpdatingLeaderboardConfig}
+                  className={`font-bold text-xs cursor-pointer ${
+                    leaderboardConfig.leaderboardEnabled !== false
+                      ? 'border-destructive text-destructive hover:bg-destructive/10'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {leaderboardConfig.leaderboardEnabled !== false ? (
+                    <>
+                      <Lock size={13} className="mr-1.5" /> Turn Leaderboard OFF
+                    </>
+                  ) : (
+                    <>
+                      <Unlock size={13} className="mr-1.5" /> Turn Leaderboard ON
+                    </>
+                  )}
+                </Button>
+
+                <Button size="sm" variant="ghost" className="text-xs" asChild>
+                  <Link to="/leaderboard">
+                    Open Leaderboard <ArrowRight size={12} className="ml-1" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            {/* Offline Notice Message Editor */}
+            <div className="mt-4 pt-4 border-t border-border/60">
+              <details className="group">
+                <summary className="text-xs font-bold text-foreground cursor-pointer flex items-center justify-between hover:text-primary">
+                  <span>✏️ Customize Offline Notice Shown to Public When Leaderboard is OFF</span>
+                  <span className="text-[11px] text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <Input
+                    placeholder="Enter custom offline message for students..."
+                    value={offlineMessageInput}
+                    onChange={(e) => setOfflineMessageInput(e.target.value)}
+                    className="text-xs"
+                  />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-[11px] text-muted-foreground">
+                      Default: “The leaderboard is currently paused by the event administration. All participant scores and attempts are safely recorded in our database.”
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs font-bold shrink-0"
+                      onClick={handleSaveOfflineMessage}
+                      disabled={isSavingOfflineMsg}
+                    >
+                      {isSavingOfflineMsg ? 'Saving...' : 'Save Notice'}
+                    </Button>
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
 
           {/* 🔒 LEADERBOARD SUSPENSE & FINAL REVEAL CONTROLLER */}
