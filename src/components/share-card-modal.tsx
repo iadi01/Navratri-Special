@@ -36,46 +36,135 @@ function getOrdinalSuffix(n: number): string {
   return s[(v - 20) % 10] || s[v] || s[0];
 }
 
-// Draw a 5-pointed star
-function drawStar(
+// Get dynamic inspiring quote tailored to rank and unsung heroines
+export function getInspirationalQuote(rank: number, day?: number, dayTitle?: string): string {
+  // Rank-specific tailored quotes celebrating unsung heroines & Shakti
+  if (rank === 1) {
+    return '“Radiating Supreme Shakti: Crowned Champion of India’s Unsung Heroines.”';
+  }
+  if (rank === 2) {
+    return '“Fearless Wisdom & Valor: Carrying the Torch of Begum Hazrat Mahal.”';
+  }
+  if (rank === 3) {
+    return '“Resolute Courage & Pride: Honoring the Unyielding Spirit of Matangini Hazra.”';
+  }
+  if (rank === 4) {
+    return '“Roaring Bravery: Echoing Rani Abbakka Chowta’s Fearless Defiance.”';
+  }
+  if (rank === 5) {
+    return '“Light of Knowledge: Walking the Visionary Path of Savitribai Phule.”';
+  }
+  if (rank === 6) {
+    return '“Steadfast Devotion & Grit: Inspired by Uda Devi & Jhalkari Bai.”';
+  }
+  if (rank === 7) {
+    return '“Breaking Every Barrier: Embodying Dr. Janaki Ammal’s Brilliant Mind.”';
+  }
+  if (rank === 8) {
+    return '“Voice of Truth & Equality: Upholding the Legacy of Tarabai Shinde.”';
+  }
+  if (rank === 9) {
+    return '“Defending Freedom: Standing Strong with Rani Chennamma’s Fearless Heart.”';
+  }
+  if (rank === 10) {
+    return '“Top 10 Vanguard: Leading with the Unbreakable Power of Indian Shakti.”';
+  }
+
+  // Ranks 11+: Inspiring rotating / rank-based quotes for participants
+  const participantQuotes = [
+    '“Learn from her courage. Carry the eternal Shakti forward.”',
+    '“Every spark of curiosity honors the unsung daughters of our motherland.”',
+    '“Proud Explorer: Continuing the timeless journey of courage and wisdom.”',
+    '“In the footsteps of fearless women who shaped India’s glorious destiny.”',
+    '“Unsung in history, immortal in heart: Celebrating India’s brave heroines.”',
+    '“Knowledge is your greatest weapon: Igniting the sacred fire of truth.”',
+    '“Her courage, our inspiration: Keeping the flame of freedom burning bright.”',
+    '“Standing tall with the pride, strength, and grace of Bharat’s daughters.”',
+  ];
+  return participantQuotes[(rank + (day || 0)) % participantQuotes.length];
+}
+
+// Draw a 3D faceted metallic star (military / championship medal style)
+function drawFacetedStar(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
-  spikes: number,
   outerRadius: number,
   innerRadius: number,
-  fillColor: string,
+  lightColor: string,
+  darkColor: string,
   strokeColor: string,
-  lineWidth: number = 2
+  lineWidth: number = 2.5
 ) {
-  let rot = (Math.PI / 2) * 3;
-  let x = cx;
-  let y = cy;
+  ctx.save();
+  const spikes = 5;
+  const rot = (Math.PI / 2) * 3; // start pointing straight up
   const step = Math.PI / spikes;
 
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - outerRadius);
-  for (let i = 0; i < spikes; i++) {
-    x = cx + Math.cos(rot) * outerRadius;
-    y = cy + Math.sin(rot) * outerRadius;
-    ctx.lineTo(x, y);
-    rot += step;
+  const outerPts: { x: number; y: number }[] = [];
+  const innerPts: { x: number; y: number }[] = [];
 
-    x = cx + Math.cos(rot) * innerRadius;
-    y = cy + Math.sin(rot) * innerRadius;
-    ctx.lineTo(x, y);
-    rot += step;
+  for (let i = 0; i < spikes; i++) {
+    const aOuter = rot + i * 2 * step;
+    outerPts.push({
+      x: cx + Math.cos(aOuter) * outerRadius,
+      y: cy + Math.sin(aOuter) * outerRadius,
+    });
+    const aInner = aOuter + step;
+    innerPts.push({
+      x: cx + Math.cos(aInner) * innerRadius,
+      y: cy + Math.sin(aInner) * innerRadius,
+    });
   }
-  ctx.lineTo(cx, cy - outerRadius);
+
+  // Draw 10 faceted triangles alternating highlight and shadow
+  for (let i = 0; i < spikes; i++) {
+    const tip = outerPts[i];
+    const prevInner = innerPts[(i - 1 + spikes) % spikes];
+    const nextInner = innerPts[i];
+
+    // Left facet (Highlight side)
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(prevInner.x, prevInner.y);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.closePath();
+    ctx.fillStyle = lightColor;
+    ctx.fill();
+
+    // Right facet (Shadow side)
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.lineTo(nextInner.x, nextInner.y);
+    ctx.closePath();
+    ctx.fillStyle = darkColor;
+    ctx.fill();
+  }
+
+  // Crisp perimeter stroke
+  ctx.beginPath();
+  for (let i = 0; i < spikes; i++) {
+    if (i === 0) ctx.moveTo(outerPts[i].x, outerPts[i].y);
+    else ctx.lineTo(outerPts[i].x, outerPts[i].y);
+    ctx.lineTo(innerPts[i].x, innerPts[i].y);
+  }
   ctx.closePath();
-  ctx.fillStyle = fillColor;
-  ctx.fill();
   ctx.strokeStyle = strokeColor;
   ctx.lineWidth = lineWidth;
+  ctx.lineJoin = 'round';
   ctx.stroke();
+
+  // Subtle center gleam
+  ctx.beginPath();
+  ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+
+  ctx.restore();
 }
 
-// Draw a 3-pointed royal crown for Rank 1
+// Draw a multi-faceted royal crown with jewels & sparkle for Rank 1
 function drawCrown(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -88,60 +177,142 @@ function drawCrown(
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Crown base arc
+  // 1. Velvet backing behind crown (royal deep red)
+  ctx.beginPath();
+  ctx.moveTo(-w / 2 + 8, h / 2 - 8);
+  ctx.quadraticCurveTo(0, -h / 2 + 14, w / 2 - 8, h / 2 - 8);
+  ctx.closePath();
+  ctx.fillStyle = '#991B1B';
+  ctx.fill();
+
+  // 2. Crown body base arc
   ctx.beginPath();
   ctx.moveTo(-w / 2, h / 2);
-  ctx.lineTo(-w / 2 - 4, -h / 2 + 10); // left tip
+  ctx.lineTo(-w / 2 - 4, -h / 2 + 8); // left tip
   ctx.lineTo(-w / 5, -h / 6); // left dip
-  ctx.lineTo(0, -h / 2 - 8); // center tall tip
+  ctx.lineTo(0, -h / 2 - 10); // center tall tip
   ctx.lineTo(w / 5, -h / 6); // right dip
-  ctx.lineTo(w / 2 + 4, -h / 2 + 10); // right tip
+  ctx.lineTo(w / 2 + 4, -h / 2 + 8); // right tip
   ctx.lineTo(w / 2, h / 2); // right bottom
   ctx.closePath();
 
-  // Gradient fill
-  const grad = ctx.createLinearGradient(0, -h, 0, h);
+  // Multi-stop golden gradient
+  const grad = ctx.createLinearGradient(0, -h / 2 - 10, 0, h / 2);
   grad.addColorStop(0, '#FEF08A');
-  grad.addColorStop(0.5, '#F59E0B');
-  grad.addColorStop(1, '#D97706');
+  grad.addColorStop(0.35, '#F59E0B');
+  grad.addColorStop(0.85, '#D97706');
+  grad.addColorStop(1, '#92400E');
   ctx.fillStyle = grad;
   ctx.fill();
+
+  // Facet creases running down from tips to base
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -h / 2 - 10);
+  ctx.lineTo(0, h / 2 - 10);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(120, 53, 15, 0.45)';
+  ctx.beginPath();
+  ctx.moveTo(-w / 5, -h / 6);
+  ctx.lineTo(-w / 5, h / 2 - 10);
+  ctx.moveTo(w / 5, -h / 6);
+  ctx.lineTo(w / 5, h / 2 - 10);
+  ctx.stroke();
 
   ctx.strokeStyle = darkColor;
   ctx.lineWidth = 3.5;
   ctx.lineJoin = 'round';
   ctx.stroke();
 
-  // Pearls / jewels on the tips
+  // 3. Pearls / Jewels on the 3 top tips
   const tips = [
-    { x: -w / 2 - 4, y: -h / 2 + 10, r: 6 },
-    { x: 0, y: -h / 2 - 8, r: 8 },
-    { x: w / 2 + 4, y: -h / 2 + 10, r: 6 },
+    { x: -w / 2 - 4, y: -h / 2 + 8, r: 7 },
+    { x: 0, y: -h / 2 - 10, r: 9.5 },
+    { x: w / 2 + 4, y: -h / 2 + 8, r: 7 },
   ];
   tips.forEach((tip) => {
     ctx.beginPath();
     ctx.arc(tip.x, tip.y, tip.r, 0, Math.PI * 2);
-    ctx.fillStyle = '#FEF08A';
+    const pearlGrad = ctx.createRadialGradient(
+      tip.x - tip.r * 0.3,
+      tip.y - tip.r * 0.3,
+      1,
+      tip.x,
+      tip.y,
+      tip.r
+    );
+    pearlGrad.addColorStop(0, '#FFFFFF');
+    pearlGrad.addColorStop(0.55, '#FEF08A');
+    pearlGrad.addColorStop(1, '#D97706');
+    ctx.fillStyle = pearlGrad;
     ctx.fill();
     ctx.strokeStyle = darkColor;
     ctx.lineWidth = 2.5;
     ctx.stroke();
+
+    // Specular gleam
+    ctx.beginPath();
+    ctx.arc(tip.x - tip.r * 0.3, tip.y - tip.r * 0.3, tip.r * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
   });
 
-  // Crown base band
+  // Sparkle cross on center pearl
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2;
+  const cpX = 0;
+  const cpY = -h / 2 - 10;
   ctx.beginPath();
-  ctx.roundRect(-w / 2 + 4, h / 2 - 8, w - 8, 9, 3);
-  ctx.fillStyle = '#B45309';
+  ctx.moveTo(cpX - 8, cpY);
+  ctx.lineTo(cpX + 8, cpY);
+  ctx.moveTo(cpX, cpY - 8);
+  ctx.lineTo(cpX, cpY + 8);
+  ctx.stroke();
+
+  // 4. Crown base band (Embossed gold band with gemstones)
+  const bandY = h / 2 - 10;
+  const bandH = 13;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2 + 3, bandY, w - 6, bandH, 4);
+  const bandGrad = ctx.createLinearGradient(0, bandY, 0, bandY + bandH);
+  bandGrad.addColorStop(0, '#B45309');
+  bandGrad.addColorStop(0.5, '#78350F');
+  bandGrad.addColorStop(1, '#451A03');
+  ctx.fillStyle = bandGrad;
   ctx.fill();
   ctx.strokeStyle = darkColor;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.stroke();
+
+  // 5. Gemstones on crown band
+  const gems = [
+    { x: -w / 3.4, color: '#3B82F6', border: '#1E3A8A' }, // Sapphire
+    { x: 0, color: '#EF4444', border: '#7F1D1D' },        // Ruby
+    { x: w / 3.4, color: '#10B981', border: '#064E3B' },  // Emerald
+  ];
+  gems.forEach((gem) => {
+    ctx.beginPath();
+    ctx.arc(gem.x, bandY + bandH / 2, 4.2, 0, Math.PI * 2);
+    ctx.fillStyle = gem.color;
+    ctx.fill();
+    ctx.strokeStyle = gem.border;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Specular highlight
+    ctx.beginPath();
+    ctx.arc(gem.x - 1.2, bandY + bandH / 2 - 1.2, 1.3, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+  });
 
   ctx.restore();
 }
 
-// Draw a scalloped rosette with petal lobes
-function drawScallopedRosette(
+// Draw a detailed pleated ribbon rosette with radial flutes & ridges
+function drawDetailedRosette(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
@@ -149,9 +320,13 @@ function drawScallopedRosette(
   amplitude: number,
   petals: number,
   fillColor: string,
+  darkColor: string,
   strokeColor: string,
-  lineWidth: number = 3
+  innerR: number = 82
 ) {
+  ctx.save();
+
+  // 1. Scalloped Outer Boundary Path
   ctx.beginPath();
   const totalSteps = petals * 16;
   for (let i = 0; i <= totalSteps; i++) {
@@ -163,67 +338,255 @@ function drawScallopedRosette(
     else ctx.lineTo(x, y);
   }
   ctx.closePath();
-  ctx.fillStyle = fillColor;
+
+  // Radial gradient fill for the rosette ribbon
+  const radGrad = ctx.createRadialGradient(cx, cy, innerR * 0.75, cx, cy, baseR + amplitude);
+  radGrad.addColorStop(0, fillColor);
+  radGrad.addColorStop(0.7, fillColor);
+  radGrad.addColorStop(1, darkColor);
+  ctx.fillStyle = radGrad;
   ctx.fill();
+
+  // Outer dark contour
   ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = lineWidth;
+  ctx.lineWidth = 4;
   ctx.stroke();
+
+  // 2. Radial Ribbon Pleats (3D folds between inner circle and outer scallops)
+  const angleStep = (2 * Math.PI) / petals;
+  for (let i = 0; i < petals; i++) {
+    const peakAngle = i * angleStep;
+    const valleyAngle = peakAngle + angleStep / 2;
+
+    // Peak radius & position
+    const rPeak = baseR + amplitude;
+    const px = cx + rPeak * Math.cos(peakAngle);
+    const py = cy + rPeak * Math.sin(peakAngle);
+
+    // Inner point for peak
+    const inPx = cx + (innerR - 2) * Math.cos(peakAngle);
+    const inPy = cy + (innerR - 2) * Math.sin(peakAngle);
+
+    // Valley radius & position
+    const rValley = baseR - amplitude * 0.45;
+    const vx = cx + rValley * Math.cos(valleyAngle);
+    const vy = cy + rValley * Math.sin(valleyAngle);
+
+    // Inner point for valley
+    const inVx = cx + (innerR - 2) * Math.cos(valleyAngle);
+    const inVy = cy + (innerR - 2) * Math.sin(valleyAngle);
+
+    // Subtle shaded pleat facet
+    ctx.beginPath();
+    ctx.moveTo(inVx, inVy);
+    ctx.lineTo(vx, vy);
+    ctx.lineTo(px, py);
+    ctx.lineTo(inPx, inPy);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.fill();
+
+    // Crease line at the valley fold (dark shadow)
+    ctx.beginPath();
+    ctx.moveTo(inVx, inVy);
+    ctx.lineTo(vx, vy);
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+
+    // Highlight ridge line at the peak fold (bright crest)
+    ctx.beginPath();
+    ctx.moveTo(inPx, inPy);
+    ctx.lineTo(px, py);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.45;
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+  }
+
+  // 3. Concentric decorative rings on the pleated ribbon
+  ctx.beginPath();
+  ctx.arc(cx, cy, baseR - 8, 0, Math.PI * 2);
+  ctx.strokeStyle = darkColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, baseR - 14, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]); // reset dash
+
+  ctx.restore();
 }
 
-// Draw laurel wreath leaves curving inside the disc
-function drawLaurelWreath(
+// Draw a detailed laurel wreath with curved stems, double leaves, veins & berries
+function drawDetailedLaurelWreath(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
   r: number,
-  leafColor: string
+  leafColor: string,
+  berryColor: string = '#F59E0B'
 ) {
   ctx.save();
-  ctx.fillStyle = leafColor;
 
   const numLeaves = 8;
-  // Left branch
+  const startAngleOffset = Math.PI * 0.18; // clearance at bottom
+  const arcSpan = Math.PI * 0.58;
+
+  // Left branch curved stem
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI * 0.5 + startAngleOffset, Math.PI * 0.5 + startAngleOffset + arcSpan);
+  ctx.strokeStyle = leafColor;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Right branch curved stem
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI * 0.5 - startAngleOffset - arcSpan, Math.PI * 0.5 - startAngleOffset);
+  ctx.strokeStyle = leafColor;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Left branch leaves & berries
   for (let i = 0; i < numLeaves; i++) {
     const t = i / (numLeaves - 1);
-    const angle = Math.PI * 0.75 + t * (Math.PI * 0.55); // from bottom-left to top-left
+    const angle = Math.PI * 0.5 + startAngleOffset + t * arcSpan;
     const lx = cx + r * Math.cos(angle);
     const ly = cy + r * Math.sin(angle);
 
     ctx.save();
     ctx.translate(lx, ly);
     ctx.rotate(angle + Math.PI / 2);
+
+    // Inner leaf
     ctx.beginPath();
-    ctx.ellipse(0, 0, 9, 4.5, 0.4, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 10, 5, 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = leafColor;
     ctx.fill();
+    ctx.strokeStyle = '#1C332E';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Leaf spine
     ctx.beginPath();
-    ctx.ellipse(4, -4, 7, 3.5, -0.4, 0, Math.PI * 2);
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(5, 0);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Outer leaf
+    ctx.beginPath();
+    ctx.ellipse(5, -5, 8, 4, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = leafColor;
     ctx.fill();
+    ctx.strokeStyle = '#1C332E';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
     ctx.restore();
+
+    // Accent berry between leaf pairs
+    if (i < numLeaves - 1) {
+      const berryAngle = angle + (arcSpan / (numLeaves - 1)) * 0.5;
+      const bx = cx + (r + 7) * Math.cos(berryAngle);
+      const by = cy + (r + 7) * Math.sin(berryAngle);
+      ctx.beginPath();
+      ctx.arc(bx, by, 3, 0, Math.PI * 2);
+      ctx.fillStyle = berryColor;
+      ctx.fill();
+      ctx.strokeStyle = '#1C332E';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
 
-  // Right branch
+  // Right branch leaves & berries
   for (let i = 0; i < numLeaves; i++) {
     const t = i / (numLeaves - 1);
-    const angle = Math.PI * 0.25 - t * (Math.PI * 0.55); // from bottom-right to top-right
+    const angle = Math.PI * 0.5 - startAngleOffset - t * arcSpan;
     const rx = cx + r * Math.cos(angle);
     const ry = cy + r * Math.sin(angle);
 
     ctx.save();
     ctx.translate(rx, ry);
     ctx.rotate(angle - Math.PI / 2);
+
+    // Inner leaf
     ctx.beginPath();
-    ctx.ellipse(0, 0, 9, 4.5, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 10, 5, -0.4, 0, Math.PI * 2);
+    ctx.fillStyle = leafColor;
     ctx.fill();
+    ctx.strokeStyle = '#1C332E';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Leaf spine
     ctx.beginPath();
-    ctx.ellipse(-4, -4, 7, 3.5, 0.4, 0, Math.PI * 2);
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(5, 0);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Outer leaf
+    ctx.beginPath();
+    ctx.ellipse(-5, -5, 8, 4, 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = leafColor;
     ctx.fill();
+    ctx.strokeStyle = '#1C332E';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
     ctx.restore();
+
+    // Accent berry between leaf pairs
+    if (i < numLeaves - 1) {
+      const berryAngle = angle - (arcSpan / (numLeaves - 1)) * 0.5;
+      const bx = cx + (r + 7) * Math.cos(berryAngle);
+      const by = cy + (r + 7) * Math.sin(berryAngle);
+      ctx.beginPath();
+      ctx.arc(bx, by, 3, 0, Math.PI * 2);
+      ctx.fillStyle = berryColor;
+      ctx.fill();
+      ctx.strokeStyle = '#1C332E';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
+
+  // Small ribbon tie at the bottom center of the wreath
+  const bowY = cy + r + 2;
+  ctx.beginPath();
+  ctx.arc(cx, bowY, 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = berryColor;
+  ctx.fill();
+  ctx.strokeStyle = '#1C332E';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Tiny bow ribbon loops
+  ctx.beginPath();
+  ctx.ellipse(cx - 7, bowY, 5, 2.5, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(cx + 7, bowY, 5, 2.5, 0.2, 0, Math.PI * 2);
+  ctx.fillStyle = berryColor;
+  ctx.fill();
+  ctx.strokeStyle = '#1C332E';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 
   ctx.restore();
 }
 
-// Draw 3D folded horizontal ribbon banner
+// Draw 3D folded horizontal ribbon banner with inner stitching
 function drawFoldedBanner(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -238,9 +601,9 @@ function drawFoldedBanner(
 ) {
   ctx.save();
 
-  const wingW = 54;
+  const wingW = 56;
   const wingH = h - 6;
-  const foldW = 20;
+  const foldW = 22;
 
   // 1. Left wing (behind)
   ctx.beginPath();
@@ -270,7 +633,7 @@ function drawFoldedBanner(
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // 3. Fold shadow triangles
+  // 3. Fold shadow triangles (under the wings)
   ctx.beginPath();
   ctx.moveTo(cx - w / 2, cy + h / 2);
   ctx.lineTo(cx - w / 2, cy + wingH / 2 + 10);
@@ -287,28 +650,40 @@ function drawFoldedBanner(
   ctx.fillStyle = '#1C332E';
   ctx.fill();
 
-  // 4. Center main banner rectangle
+  // 4. Center main banner rectangle with gradient
   ctx.beginPath();
-  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, 6);
-  ctx.fillStyle = bgColor;
+  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, 8);
+  const banGrad = ctx.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
+  banGrad.addColorStop(0, bgColor);
+  banGrad.addColorStop(1, shadowColor);
+  ctx.fillStyle = banGrad;
   ctx.fill();
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 3.5;
   ctx.stroke();
+
+  // Inner stitched dashed border
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2 + 4, cy - h / 2 + 4, w - 8, h - 8, 6);
+  ctx.stroke();
+  ctx.setLineDash([]); // reset dash
 
   // Text inside banner
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = textColor;
   ctx.font = '900 24px "DM Sans", -apple-system, sans-serif';
-  ctx.letterSpacing = '1px';
+  ctx.letterSpacing = '1.5px';
   ctx.fillText(text, cx, cy);
 
   ctx.restore();
 }
 
-// Draw two striped hanging ribbon tails behind the banner
-function drawRibbonTails(
+// Draw two striped hanging ribbon tails behind the banner with grosgrain texture
+function drawDetailedRibbonTails(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
@@ -318,9 +693,29 @@ function drawRibbonTails(
 ) {
   ctx.save();
   const tailWidth = 44;
-  const tailLength = 110;
+  const tailLength = 116;
 
-  // Left tail
+  // Drop shadow behind ribbon tails
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+  ctx.beginPath();
+  ctx.moveTo(cx - 30 + 4, cy + 4);
+  ctx.lineTo(cx - 75 + 4, cy + tailLength + 4);
+  ctx.lineTo(cx - 75 + tailWidth / 2 + 4, cy + tailLength - 18 + 4);
+  ctx.lineTo(cx - 75 + tailWidth + 4, cy + tailLength + 4);
+  ctx.lineTo(cx - 30 + tailWidth + 4, cy + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(cx + 30 - tailWidth + 4, cy + 4);
+  ctx.lineTo(cx + 75 - tailWidth + 4, cy + tailLength + 4);
+  ctx.lineTo(cx + 75 - tailWidth / 2 + 4, cy + tailLength - 18 + 4);
+  ctx.lineTo(cx + 75 + 4, cy + tailLength + 4);
+  ctx.lineTo(cx + 30 + 4, cy + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Left tail base
   ctx.beginPath();
   ctx.moveTo(cx - 30, cy);
   ctx.lineTo(cx - 75, cy + tailLength);
@@ -338,13 +733,25 @@ function drawRibbonTails(
   ctx.beginPath();
   ctx.moveTo(cx - 30 + 12, cy);
   ctx.lineTo(cx - 75 + 12, cy + tailLength - 4);
-  ctx.lineTo(cx - 75 + 24, cy + tailLength - 16);
-  ctx.lineTo(cx - 30 + 24, cy);
+  ctx.lineTo(cx - 75 + 22, cy + tailLength - 15);
+  ctx.lineTo(cx - 30 + 22, cy);
   ctx.closePath();
   ctx.fillStyle = color2;
   ctx.fill();
 
-  // Right tail
+  // Left fine grosgrain texture lines
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+  ctx.lineWidth = 1;
+  for (let s = 10; s < tailLength - 20; s += 8) {
+    const frac = s / tailLength;
+    const sx = cx - 30 - (45 * frac);
+    ctx.beginPath();
+    ctx.moveTo(sx + 4, cy + s);
+    ctx.lineTo(sx + tailWidth - 4, cy + s);
+    ctx.stroke();
+  }
+
+  // Right tail base
   ctx.beginPath();
   ctx.moveTo(cx + 30 - tailWidth, cy);
   ctx.lineTo(cx + 75 - tailWidth, cy + tailLength);
@@ -360,13 +767,69 @@ function drawRibbonTails(
 
   // Right inner stripe
   ctx.beginPath();
-  ctx.moveTo(cx + 30 - 24, cy);
-  ctx.lineTo(cx + 75 - 24, cy + tailLength - 16);
+  ctx.moveTo(cx + 30 - 22, cy);
+  ctx.lineTo(cx + 75 - 22, cy + tailLength - 15);
   ctx.lineTo(cx + 75 - 12, cy + tailLength - 4);
   ctx.lineTo(cx + 30 - 12, cy);
   ctx.closePath();
   ctx.fillStyle = color2;
   ctx.fill();
+
+  // Right fine grosgrain texture lines
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+  ctx.lineWidth = 1;
+  for (let s = 10; s < tailLength - 20; s += 8) {
+    const frac = s / tailLength;
+    const sx = cx + 30 - tailWidth + (45 * frac);
+    ctx.beginPath();
+    ctx.moveTo(sx + 4, cy + s);
+    ctx.lineTo(sx + tailWidth - 4, cy + s);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Draw alternating long & short radiating sunburst rays with sparkle tips
+function drawSunburstRays(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  innerR: number,
+  numRays: number,
+  rayColor: string
+) {
+  ctx.save();
+  ctx.strokeStyle = rayColor;
+  ctx.fillStyle = rayColor;
+
+  for (let i = 0; i < numRays; i++) {
+    const angle = (i * 2 * Math.PI) / numRays;
+    const isLong = i % 2 === 0;
+    const rayLen = isLong ? 52 : 30;
+    const lineWidth = isLong ? 2.5 : 1.6;
+
+    const x1 = cx + (innerR + 8) * Math.cos(angle);
+    const y1 = cy + (innerR + 8) * Math.sin(angle);
+    const x2 = cx + (innerR + 8 + rayLen) * Math.cos(angle);
+    const y2 = cy + (innerR + 8 + rayLen) * Math.sin(angle);
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Diamond sparkle or dot at the end of long rays
+    if (isLong) {
+      const tipX = cx + (innerR + 14 + rayLen) * Math.cos(angle);
+      const tipY = cy + (innerR + 14 + rayLen) * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   ctx.restore();
 }
@@ -609,25 +1072,10 @@ export function ShareCardModal({
     const rosetteRadius = 110;
 
     // A. Radiating Sunburst Rays behind medal
-    ctx.save();
-    ctx.strokeStyle = rayColor;
-    ctx.lineWidth = 2.5;
-    const numRays = 24;
-    for (let i = 0; i < numRays; i++) {
-      const angle = (i * 2 * Math.PI) / numRays;
-      const x1 = medalCenterX + (rosetteRadius + 10) * Math.cos(angle);
-      const y1 = medalCenterY + (rosetteRadius + 10) * Math.sin(angle);
-      const x2 = medalCenterX + (rosetteRadius + 50) * Math.cos(angle);
-      const y2 = medalCenterY + (rosetteRadius + 50) * Math.sin(angle);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-    ctx.restore();
+    drawSunburstRays(ctx, medalCenterX, medalCenterY, rosetteRadius, 32, rayColor);
 
     // B. Hanging Striped Ribbon Tails
-    drawRibbonTails(
+    drawDetailedRibbonTails(
       ctx,
       medalCenterX,
       medalCenterY + 40,
@@ -636,8 +1084,8 @@ export function ShareCardModal({
       '#1C332E'
     );
 
-    // C. Scalloped Rosette Outer Disc
-    drawScallopedRosette(
+    // C. Scalloped Rosette Outer Disc with radial pleats & flutes
+    drawDetailedRosette(
       ctx,
       medalCenterX,
       medalCenterY,
@@ -646,15 +1094,9 @@ export function ShareCardModal({
       24,
       rosetteColor,
       rosetteDark,
-      4
+      '#1C332E',
+      82
     );
-
-    // Concentric inner line
-    ctx.beginPath();
-    ctx.arc(medalCenterX, medalCenterY, rosetteRadius - 16, 0, Math.PI * 2);
-    ctx.strokeStyle = rosetteDark;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
 
     // D. Inner White / Cream Disc
     ctx.beginPath();
@@ -662,20 +1104,21 @@ export function ShareCardModal({
     ctx.fillStyle = innerDiscColor;
     ctx.fill();
     ctx.strokeStyle = '#1C332E';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3.5;
     ctx.stroke();
 
     // Stitched inner dashed circle
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.arc(medalCenterX, medalCenterY, 74, 0, Math.PI * 2);
-    ctx.strokeStyle = '#CBD5E1';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.setLineDash([]); // Reset dash
 
-    // E. Laurel Wreath Leaves inside disc
-    drawLaurelWreath(ctx, medalCenterX, medalCenterY, 60, wreathColor);
+    // E. Laurel Wreath Leaves inside disc with berries
+    const wreathBerryColor = currentRank === 2 ? '#94A3B8' : currentRank === 3 ? '#FB923C' : '#F59E0B';
+    drawDetailedLaurelWreath(ctx, medalCenterX, medalCenterY, 60, wreathColor, wreathBerryColor);
 
     // F. Rank Number & Ordinal Suffix inside disc
     ctx.save();
@@ -707,30 +1150,34 @@ export function ShareCardModal({
 
     // G. Top Crown or Stars Decoration
     if (currentRank === 1) {
-      // 👑 Rank 1: Crown on top
+      // 👑 Rank 1: Royal Gemmed Crown on top
       drawCrown(
         ctx,
         medalCenterX,
         medalCenterY - rosetteRadius - 18,
-        86,
-        48,
+        90,
+        50,
         '#F59E0B',
         '#1C332E'
       );
-    } else if (currentRank === 2 || currentRank === 3 || (currentRank >= 4 && currentRank <= 10)) {
-      // ⭐ Rank 2, 3, and 4-10: 3 Stars on top
-      const starColor = currentRank === 2 ? '#E2E8F0' : currentRank === 3 ? '#FED7AA' : '#FDE047';
-      const starBorder = currentRank === 2 ? '#475569' : currentRank === 3 ? '#9A3412' : '#047857';
-
-      // Center taller star
-      drawStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 5, 20, 9, starColor, starBorder, 2.5);
-      // Left side star
-      drawStar(ctx, medalCenterX - 36, medalCenterY - rosetteRadius - 18, 5, 14, 6.5, starColor, starBorder, 2);
-      // Right side star
-      drawStar(ctx, medalCenterX + 36, medalCenterY - rosetteRadius - 18, 5, 14, 6.5, starColor, starBorder, 2);
+    } else if (currentRank === 2) {
+      // 🥈 Rank 2: 3 Faceted 3D Silver Stars
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 22, 10, '#FFFFFF', '#94A3B8', '#1E293B', 2.5);
+      drawFacetedStar(ctx, medalCenterX - 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFFFFF', '#94A3B8', '#1E293B', 2);
+      drawFacetedStar(ctx, medalCenterX + 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFFFFF', '#94A3B8', '#1E293B', 2);
+    } else if (currentRank === 3) {
+      // 🥉 Rank 3: 3 Faceted 3D Bronze Stars
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 22, 10, '#FFEDD5', '#EA580C', '#7C2D12', 2.5);
+      drawFacetedStar(ctx, medalCenterX - 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFEDD5', '#EA580C', '#7C2D12', 2);
+      drawFacetedStar(ctx, medalCenterX + 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFEDD5', '#EA580C', '#7C2D12', 2);
+    } else if (currentRank >= 4 && currentRank <= 10) {
+      // 🌟 Rank 4-10: 3 Faceted 3D Emerald & Gold Stars
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 22, 10, '#FEF08A', '#F59E0B', '#064E3B', 2.5);
+      drawFacetedStar(ctx, medalCenterX - 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FEF08A', '#F59E0B', '#064E3B', 2);
+      drawFacetedStar(ctx, medalCenterX + 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FEF08A', '#F59E0B', '#064E3B', 2);
     } else {
-      // 🎖️ Rank 11+: Single Star on top
-      drawStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 20, 5, 22, 10, '#FDA4AF', '#881337', 2.5);
+      // 🎖️ Rank 11+: Single Faceted 3D Rose Star
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 22, 24, 11, '#FFE4E6', '#FB7185', '#881337', 2.5);
     }
 
     // H. Folded Ribbon Banner
@@ -887,10 +1334,17 @@ export function ShareCardModal({
     ctx.fill();
     ctx.stroke();
 
+    // Dynamic quote tailored to rank and unsung heroines
+    const quote = getInspirationalQuote(currentRank, day, dayTitle);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#1C332E';
-    ctx.font = 'italic 700 20px "DM Sans", -apple-system, sans-serif';
-    ctx.fillText('“Learn from her courage. Carry the Shakti forward.”', width / 2, footerY + 44);
+    let quoteFontSize = 20;
+    ctx.font = `italic 700 ${quoteFontSize}px "DM Sans", -apple-system, sans-serif`;
+    while (ctx.measureText(quote).width > footerW - 60 && quoteFontSize > 13) {
+      quoteFontSize -= 1;
+      ctx.font = `italic 700 ${quoteFontSize}px "DM Sans", -apple-system, sans-serif`;
+    }
+    ctx.fillText(quote, width / 2, footerY + 44);
 
     ctx.fillStyle = '#B82348';
     ctx.font = '900 24px "Baloo 2", -apple-system, sans-serif';
