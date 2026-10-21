@@ -389,6 +389,22 @@ export async function setDayLive(day: number, shouldBeLive: boolean): Promise<nu
   return result;
 }
 
+export async function setAllDaysLive(days: number[]): Promise<number[]> {
+  const result = Array.from(new Set(days)).sort((a, b) => a - b);
+  try {
+    localStorage.setItem(LIVE_DAYS_STORAGE_KEY, JSON.stringify(result));
+    window.dispatchEvent(new Event('pehchaan_live_days_changed'));
+    fetch('/api/admin/live-days', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ days: result }),
+    }).catch(() => {});
+  } catch (err) {
+    console.error('Failed to update live days:', err);
+  }
+  return result;
+}
+
 // =========================================================================
 // 🔒 LEADERBOARD VISIBILITY & SUSPENSE STORE
 // =========================================================================

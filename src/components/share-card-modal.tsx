@@ -601,9 +601,9 @@ function drawFoldedBanner(
 ) {
   ctx.save();
 
-  const wingW = 56;
+  const wingW = 60;
   const wingH = h - 6;
-  const foldW = 22;
+  const foldW = 24;
 
   // 1. Left wing (behind)
   ctx.beginPath();
@@ -692,8 +692,8 @@ function drawDetailedRibbonTails(
   borderColor: string = '#1C332E'
 ) {
   ctx.save();
-  const tailWidth = 44;
-  const tailLength = 116;
+  const tailWidth = 48;
+  const tailLength = 126;
 
   // Drop shadow behind ribbon tails
   ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
@@ -806,7 +806,7 @@ function drawSunburstRays(
   for (let i = 0; i < numRays; i++) {
     const angle = (i * 2 * Math.PI) / numRays;
     const isLong = i % 2 === 0;
-    const rayLen = isLong ? 52 : 30;
+    const rayLen = isLong ? 56 : 34;
     const lineWidth = isLong ? 2.5 : 1.6;
 
     const x1 = cx + (innerR + 8) * Math.cos(angle);
@@ -861,7 +861,8 @@ export function ShareCardModal({
   const websiteUrl = 'https://navratri-event.vercel.app';
   const besocialUrl = 'https://besocial.amityonline.com/?tab=Posts';
 
-  const safePoints = Math.min(points, maxPoints);
+  const effectiveMaxPoints = puzzleBonus && puzzleBonus > 0 ? maxPoints + puzzleBonus : maxPoints;
+  const safePoints = Math.min(points, effectiveMaxPoints);
   const safeAccuracy = Math.min(firstTryCount, totalQuestions);
 
   const isOverall = dayTitle.toLowerCase().includes('overall');
@@ -1065,11 +1066,13 @@ export function ShareCardModal({
     ctx.fillText(subTitleStr, width / 2, 180);
 
     // ==========================================
-    // 3. Central Rosette Medal Centerpiece
+    // 3. Central Rosette Medal Centerpiece (Slightly increased size)
     // ==========================================
     const medalCenterX = width / 2;
-    const medalCenterY = 380;
-    const rosetteRadius = 110;
+    const medalCenterY = 388;
+    const rosetteRadius = 126;
+    const innerRadius = 94;
+    const innerStitchRadius = 85;
 
     // A. Radiating Sunburst Rays behind medal
     drawSunburstRays(ctx, medalCenterX, medalCenterY, rosetteRadius, 32, rayColor);
@@ -1078,7 +1081,7 @@ export function ShareCardModal({
     drawDetailedRibbonTails(
       ctx,
       medalCenterX,
-      medalCenterY + 40,
+      medalCenterY + 44,
       ribbonColor1,
       ribbonColor2,
       '#1C332E'
@@ -1090,17 +1093,17 @@ export function ShareCardModal({
       medalCenterX,
       medalCenterY,
       rosetteRadius,
-      12,
+      14,
       24,
       rosetteColor,
       rosetteDark,
       '#1C332E',
-      82
+      innerRadius
     );
 
     // D. Inner White / Cream Disc
     ctx.beginPath();
-    ctx.arc(medalCenterX, medalCenterY, 82, 0, Math.PI * 2);
+    ctx.arc(medalCenterX, medalCenterY, innerRadius, 0, Math.PI * 2);
     ctx.fillStyle = innerDiscColor;
     ctx.fill();
     ctx.strokeStyle = '#1C332E';
@@ -1110,7 +1113,7 @@ export function ShareCardModal({
     // Stitched inner dashed circle
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
-    ctx.arc(medalCenterX, medalCenterY, 74, 0, Math.PI * 2);
+    ctx.arc(medalCenterX, medalCenterY, innerStitchRadius, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
@@ -1118,7 +1121,7 @@ export function ShareCardModal({
 
     // E. Laurel Wreath Leaves inside disc with berries
     const wreathBerryColor = currentRank === 2 ? '#94A3B8' : currentRank === 3 ? '#FB923C' : '#F59E0B';
-    drawDetailedLaurelWreath(ctx, medalCenterX, medalCenterY, 60, wreathColor, wreathBerryColor);
+    drawDetailedLaurelWreath(ctx, medalCenterX, medalCenterY, 69, wreathColor, wreathBerryColor);
 
     // F. Rank Number & Ordinal Suffix inside disc
     ctx.save();
@@ -1127,7 +1130,7 @@ export function ShareCardModal({
     ctx.fillStyle = numberColor;
 
     // Font size adapts for 1-digit vs 2-digit ranks
-    const numberFontSize = currentRank < 10 ? 66 : currentRank < 100 ? 52 : 44;
+    const numberFontSize = currentRank < 10 ? 76 : currentRank < 100 ? 60 : 48;
     ctx.font = `900 ${numberFontSize}px "Baloo 2", -apple-system, sans-serif`;
 
     // Measure to place suffix neatly
@@ -1139,7 +1142,7 @@ export function ShareCardModal({
 
     // Suffix superscript
     if (suffix) {
-      ctx.font = '800 24px "Baloo 2", -apple-system, sans-serif';
+      ctx.font = '800 27px "Baloo 2", -apple-system, sans-serif';
       ctx.fillText(
         suffix,
         medalCenterX + numOffset + numMetrics.width * 0.55 + 8,
@@ -1154,40 +1157,40 @@ export function ShareCardModal({
       drawCrown(
         ctx,
         medalCenterX,
-        medalCenterY - rosetteRadius - 18,
-        90,
-        50,
+        medalCenterY - rosetteRadius - 22,
+        98,
+        54,
         '#F59E0B',
         '#1C332E'
       );
     } else if (currentRank === 2) {
       // 🥈 Rank 2: 3 Faceted 3D Silver Stars
-      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 22, 10, '#FFFFFF', '#94A3B8', '#1E293B', 2.5);
-      drawFacetedStar(ctx, medalCenterX - 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFFFFF', '#94A3B8', '#1E293B', 2);
-      drawFacetedStar(ctx, medalCenterX + 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFFFFF', '#94A3B8', '#1E293B', 2);
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 32, 25, 11.5, '#FFFFFF', '#94A3B8', '#1E293B', 2.5);
+      drawFacetedStar(ctx, medalCenterX - 42, medalCenterY - rosetteRadius - 20, 17, 8, '#FFFFFF', '#94A3B8', '#1E293B', 2);
+      drawFacetedStar(ctx, medalCenterX + 42, medalCenterY - rosetteRadius - 20, 17, 8, '#FFFFFF', '#94A3B8', '#1E293B', 2);
     } else if (currentRank === 3) {
       // 🥉 Rank 3: 3 Faceted 3D Bronze Stars
-      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 22, 10, '#FFEDD5', '#EA580C', '#7C2D12', 2.5);
-      drawFacetedStar(ctx, medalCenterX - 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFEDD5', '#EA580C', '#7C2D12', 2);
-      drawFacetedStar(ctx, medalCenterX + 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FFEDD5', '#EA580C', '#7C2D12', 2);
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 32, 25, 11.5, '#FFEDD5', '#EA580C', '#7C2D12', 2.5);
+      drawFacetedStar(ctx, medalCenterX - 42, medalCenterY - rosetteRadius - 20, 17, 8, '#FFEDD5', '#EA580C', '#7C2D12', 2);
+      drawFacetedStar(ctx, medalCenterX + 42, medalCenterY - rosetteRadius - 20, 17, 8, '#FFEDD5', '#EA580C', '#7C2D12', 2);
     } else if (currentRank >= 4 && currentRank <= 10) {
       // 🌟 Rank 4-10: 3 Faceted 3D Emerald & Gold Stars
-      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 28, 22, 10, '#FEF08A', '#F59E0B', '#064E3B', 2.5);
-      drawFacetedStar(ctx, medalCenterX - 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FEF08A', '#F59E0B', '#064E3B', 2);
-      drawFacetedStar(ctx, medalCenterX + 38, medalCenterY - rosetteRadius - 18, 15, 7, '#FEF08A', '#F59E0B', '#064E3B', 2);
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 32, 25, 11.5, '#FEF08A', '#F59E0B', '#064E3B', 2.5);
+      drawFacetedStar(ctx, medalCenterX - 42, medalCenterY - rosetteRadius - 20, 17, 8, '#FEF08A', '#F59E0B', '#064E3B', 2);
+      drawFacetedStar(ctx, medalCenterX + 42, medalCenterY - rosetteRadius - 20, 17, 8, '#FEF08A', '#F59E0B', '#064E3B', 2);
     } else {
       // 🎖️ Rank 11+: Single Faceted 3D Rose Star
-      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 22, 24, 11, '#FFE4E6', '#FB7185', '#881337', 2.5);
+      drawFacetedStar(ctx, medalCenterX, medalCenterY - rosetteRadius - 24, 26, 12, '#FFE4E6', '#FB7185', '#881337', 2.5);
     }
 
     // H. Folded Ribbon Banner
-    const bannerW = currentRank > 99 ? 440 : 380;
+    const bannerW = currentRank > 99 ? 460 : 400;
     drawFoldedBanner(
       ctx,
       medalCenterX,
-      medalCenterY + 98,
+      medalCenterY + 112,
       bannerW,
-      50,
+      54,
       bannerTitle,
       bannerBg,
       bannerShadow,
@@ -1202,14 +1205,14 @@ export function ShareCardModal({
     ctx.fillStyle = '#1C332E';
     ctx.font = '900 46px "Baloo 2", -apple-system, sans-serif';
     const cleanName = (fullName || 'Anonymous Explorer').trim();
-    ctx.fillText(cleanName.toUpperCase(), width / 2, 655);
+    ctx.fillText(cleanName.toUpperCase(), width / 2, 665);
 
     // Course & Batch
     ctx.fillStyle = '#5A7A73';
     ctx.font = '700 22px "DM Sans", -apple-system, sans-serif';
     ctx.letterSpacing = '1px';
     const batchText = batch ? `Batch ${batch}` : year;
-    ctx.fillText(`${course} · ${batchText} · AMITY ONLINE`, width / 2, 695);
+    ctx.fillText(`${course} · ${batchText} · AMITY ONLINE`, width / 2, 705);
 
     // ==========================================
     // 5. Rounded Score Box (Exact replica of image)
@@ -1217,7 +1220,7 @@ export function ShareCardModal({
     const boxW = 460;
     const boxH = 120;
     const boxX = (width - boxW) / 2;
-    const boxY = 740;
+    const boxY = 745;
 
     // Box shadow
     ctx.fillStyle = '#E8D4D8';

@@ -157,7 +157,9 @@ function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'overall' | 'daily'>(
     search.day ? 'daily' : search.view === 'daily' ? 'daily' : 'overall'
   );
-  const [selectedDay, setSelectedDay] = useState<number>(search.day || liveDays[0] || 1);
+  const [selectedDay, setSelectedDay] = useState<number>(
+    search.day || (liveDays.length > 0 ? Math.max(...liveDays) : 10)
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   const [overallList, setOverallList] = useState<OverallLeaderboardEntry[]>([]);
@@ -181,11 +183,22 @@ function Leaderboard() {
     puzzleBonus?: number;
   } | null>(null);
 
-  // Active / open days currently enabled by admin
+  // Tournament days:
+  // If game is fully off (liveDays is empty) or if Day 10 is reached, all 10 chapters are active!
+  // Otherwise, include all live days plus all previous days where students submitted scores.
   const openDays = useMemo(() => {
-    const list = Array.isArray(liveDays) && liveDays.length > 0 ? liveDays : [1];
-    return Array.from(new Set(list)).sort((a, b) => a - b);
-  }, [liveDays]);
+    if (!liveDays || liveDays.length === 0 || liveDays.includes(10)) {
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    }
+    const daysSet = new Set<number>(liveDays);
+    overallList.forEach(entry => {
+      entry.dayBreakdown?.forEach(d => {
+        if (d.day >= 1 && d.day <= 10) daysSet.add(d.day);
+      });
+    });
+    const list = Array.from(daysSet);
+    return list.length > 0 ? list.sort((a, b) => a - b) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  }, [liveDays, overallList]);
 
   const overallMaxScore = useMemo(() => {
     return openDays.reduce((sum, d) => sum + (d === 10 ? 100 : 30), 0);
@@ -200,16 +213,17 @@ function Leaderboard() {
     const isOverall = !forDay && !entry.day && 'totalPoints' in entry;
     if (isOverall) {
       const maxPoints = overallMaxScore;
-      const points = Math.min(entry.totalPoints ?? 0, maxPoints);
+      const effectiveMax = entry.puzzleBonus && entry.puzzleBonus > 0 ? maxPoints + entry.puzzleBonus : maxPoints;
+      const points = Math.min(entry.totalPoints ?? 0, effectiveMax);
       const totalQuestions = overallTotalQuestions;
       const firstTryCount = Math.min(entry.firstTryTotal ?? 0, totalQuestions);
       const timeTaken = entry.totalTimeSeconds ?? 0;
       const tier = points >= maxPoints ? 'Herstory Champion' : points >= Math.round(maxPoints * 0.66) ? 'Curiosity Star' : 'Brave Explorer';
-      const latestLiveDay = openDays[openDays.length - 1] || 1;
+      const latestLiveDay = openDays[openDays.length - 1] || 10;
 
       setShareCardData({
         day: latestLiveDay,
-        dayTitle: `Overall Championship (${openDays.length} Chapters Active)`,
+        dayTitle: `Overall Championship (${openDays.length} Chapters)`,
         points,
         maxPoints,
         timeTaken,
@@ -254,9 +268,10 @@ function Leaderboard() {
     });
   };
 
-  const loadData = (daysToUse: number[] = liveDays) => {
-    const active = daysToUse && daysToUse.length > 0 ? daysToUse : [1];
-    setOverallList(getOverallLeaderboard(active));
+  const loadData = () => {
+    // 🏆 Always load full tournament scores across all days so student scores
+    // are NEVER hidden or lost, even when all quizzes/game are turned off!
+    setOverallList(getOverallLeaderboard());
     setDailyList(getLeaderboardEntries(selectedDay));
     try {
       setUserBest(Number(localStorage.getItem(`${BEST_KEY_PREFIX}${selectedDay}`)) || 0);
@@ -266,7 +281,7 @@ function Leaderboard() {
   };
 
   useEffect(() => {
-    loadData(liveDays);
+    loadData();
   }, [liveDays, selectedDay]);
 
   useEffect(() => {
@@ -277,12 +292,13 @@ function Leaderboard() {
       setLeaderboardConfig(cfg);
     });
     syncLeaderboardWithServer().then(() => {
-      loadData(getLiveDays());
+      loadData();
     });
     const handleUpdate = () => {
       const days = getLiveDays();
       setLiveDays(days);
       setLeaderboardConfig(getLeaderboardConfig());
+      loadData();
     };
     window.addEventListener('pehchaan_leaderboard_updated', handleUpdate);
     window.addEventListener('pehchaan_live_days_changed', handleUpdate);
@@ -292,7 +308,7 @@ function Leaderboard() {
       window.removeEventListener('pehchaan_live_days_changed', handleUpdate);
       window.removeEventListener('pehchaan_leaderboard_config_changed', handleUpdate);
     };
-  }, []);
+  }, [selectedDay]);
 
   // Whether current view is in suspense
   const isSuspenseActive = useMemo(() => {
@@ -802,7 +818,7 @@ function Leaderboard() {
             <div className="flex items-center gap-2">
               <Button size="sm" asChild className="gap-1.5 text-xs font-extrabold shadow-xs">
                 <Link to="/challenge" search={{ day: selectedDay }}>
-                  Play Day {String(selectedDay).padStart(2, '0')} <ArrowRight size={13} />
+                  {liveDays.includes(selectedDay) ? `Play Day ${String(selectedDay).padStart(2, '0')}` : `View Day ${String(selectedDay).padStart(2, '0')}`} <ArrowRight size={13} />
                 </Link>
               </Button>
             </div>

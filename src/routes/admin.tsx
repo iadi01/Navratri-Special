@@ -48,6 +48,7 @@ import {
   getLiveDays,
   syncLiveDaysWithServer,
   toggleDayLive,
+  setAllDaysLive,
   getLeaderboardConfig,
   syncLeaderboardConfigWithServer,
   updateLeaderboardConfig,
@@ -304,6 +305,19 @@ function AdminPage() {
 
   const handleToggleDay = async (day: number) => {
     const updated = await toggleDayLive(day);
+    setLiveDays(updated);
+  };
+
+  const handleTurnAllQuizzesOff = async () => {
+    if (!confirm('Turn OFF all quiz days? New gameplay will be closed, but the main leaderboard will continue to show all 10 days of recorded scores.')) {
+      return;
+    }
+    const updated = await setAllDaysLive([]);
+    setLiveDays(updated);
+  };
+
+  const handleMakeAllQuizzesLive = async () => {
+    const updated = await setAllDaysLive([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     setLiveDays(updated);
   };
 
@@ -1123,11 +1137,31 @@ function AdminPage() {
                   <Radio className="text-emerald-500 animate-pulse" size={18} /> Daily Quiz Broadcast Control
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Click any day below to toggle its status. Active quizzes immediately become playable on the main site.
+                  Click any day below to toggle its status. Active quizzes become playable. When all quizzes are OFF, the main leaderboard still displays all 10 days of recorded scores.
                 </p>
               </div>
-              <div className="text-xs font-mono bg-muted px-3 py-1.5 rounded-lg">
-                Active Live Days: {liveDays.join(', ')}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTurnAllQuizzesOff}
+                  className="text-xs font-bold border-destructive text-destructive hover:bg-destructive/10 cursor-pointer"
+                  title="Turn off all quiz days (tournament closed). Leaderboard stays 100% active."
+                >
+                  <Lock size={12} className="mr-1" /> Turn All Quizzes OFF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleMakeAllQuizzesLive}
+                  className="text-xs font-bold border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                  title="Make all 10 days playable"
+                >
+                  <Unlock size={12} className="mr-1" /> Make All 10 Days Live
+                </Button>
+                <div className="text-xs font-mono bg-muted px-3 py-1.5 rounded-lg">
+                  Active Live Days: {liveDays.length > 0 ? liveDays.join(', ') : 'None (All Quizzes OFF)'}
+                </div>
               </div>
             </div>
 
