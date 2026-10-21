@@ -869,45 +869,20 @@ export function ShareCardModal({
   const puzzleExtraText = puzzleBonus && puzzleBonus > 0 ? ` (+${puzzleBonus} Extra Points for Puzzle Challenge)` : '';
 
   const currentRank = Math.max(1, rank);
-  const suffix = getOrdinalSuffix(currentRank);
-
-  let rankHeading = `🏅 Proud to secure Rank #${currentRank} in "पहचानो कौन?"! 🌸`;
-  let rankBadgeTitle = `Rank #${currentRank} (${currentRank}${suffix} Place)`;
+  let rankText = `🏆 Secured Rank #${currentRank}`;
   if (currentRank === 1) {
-    rankHeading = `👑 Thrilled to secure 1st Rank (Grand Champion) in "पहचानो कौन?"! 🥇🌸`;
-    rankBadgeTitle = `1st Rank (Grand Champion) 🥇`;
+    rankText = `👑 Secured 1st Rank (Grand Champion)`;
   } else if (currentRank === 2) {
-    rankHeading = `🥈 Proud to secure 2nd Rank (Runner-Up) in "पहचानो कौन?"! 🥈🌸`;
-    rankBadgeTitle = `2nd Rank (Runner-Up) 🥈`;
+    rankText = `🥈 Secured 2nd Rank (Runner-Up)`;
   } else if (currentRank === 3) {
-    rankHeading = `🥉 Proud to secure 3rd Rank (Podium Finisher) in "पहचानो कौन?"! 🥉🌸`;
-    rankBadgeTitle = `3rd Rank (Podium Finisher) 🥉`;
+    rankText = `🥉 Secured 3rd Rank (Podium Finisher)`;
   } else if (currentRank <= 10) {
-    rankHeading = `🌟 Proud to secure Rank #${currentRank} (Top 10 Finalist) in "पहचानो कौन?"! 🌟🌸`;
-    rankBadgeTitle = `Rank #${currentRank} (Top 10 Finalist) ⭐`;
+    rankText = `🌟 Secured Rank #${currentRank} (Top 10)`;
   }
 
-  const studentInfo = fullName?.trim()
-    ? `\n👤 Student: ${fullName.trim()} (${course || 'Amity Online'}${batch ? ` • Batch ${batch}` : year ? ` • ${year}` : ''})`
-    : '';
-
-  const eventTitle = isOverall
-    ? `Overall Championship (All Chapters)`
-    : `Day ${String(day).padStart(2, '0')} (${dayTitle})`;
-
-  const shareCaption = `${rankHeading}
-
-🏆 Rank: ${rankBadgeTitle}
-🎖️ Event: ${eventTitle}
-🎯 Score: ${safePoints}/${maxPoints} points${puzzleExtraText}
-⚡ Time: ${timeTaken}s
-🎯 Accuracy: ${safeAccuracy}/${totalQuestions} correct${studentInfo}
-
-Can you beat my rank and score? Test your knowledge of India's unsung heroines:
-🔗 ${websiteUrl}
-
-@aahanasahay @singhsimrangopal22542
-#Navshakti #AmityOnline #PehchaanKaun #UnsungHeroinesOfIndia #BeSocial`;
+  const shareCaption = isOverall
+    ? `${rankText} in the Overall Championship of "पहचानो कौन?" with ${safePoints}/${maxPoints} points${puzzleExtraText} in ${timeTaken}s! 🌸\n\nCan you beat my rank and score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`
+    : `${rankText} in Day ${String(day).padStart(2, '0')} (${dayTitle}) of "पहचानो कौन?" with ${safePoints}/${maxPoints} points in ${timeTaken}s! 🌸\n\nCan you beat my rank and score? Test your knowledge of India's unsung heroines: ${websiteUrl}\n\n@aahanasahay @singhsimrangopal22542`;
 
   const drawCard = () => {
     const canvas = canvasRef.current;
