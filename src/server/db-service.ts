@@ -139,6 +139,21 @@ export async function checkAttemptInMongo(
       );
 
       if (byUser) {
+        // Calculate the user's authoritative rank for cleanDay
+        let userRank = 1;
+        try {
+          const higherCount = await leaderboardCol.countDocuments({
+            day: cleanDay,
+            $or: [
+              { points: { $gt: byUser.points } },
+              { points: byUser.points, timeSeconds: { $lt: byUser.timeSeconds } },
+            ],
+          });
+          userRank = higherCount + 1;
+        } catch (e: any) {
+          console.warn('Could not compute user rank in checkAttemptInMongo:', e?.message);
+        }
+
         return {
           attempted: true,
           reason: `Participant "${byUser.fullName || byUser.username || cleanId}" has already completed Day ${cleanDay} quiz.`,
@@ -151,6 +166,7 @@ export async function checkAttemptInMongo(
             year: byUser.year || '',
             batch: byUser.batch || '',
             rollNo: byUser.rollNo || '',
+            rank: userRank,
           },
         };
       }

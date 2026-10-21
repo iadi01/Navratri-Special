@@ -299,9 +299,34 @@ function Leaderboard() {
     return openDays.reduce((sum, d) => sum + (d === 10 ? 10 : 3), 0);
   }, [openDays]);
 
-  const handleOpenShare = (entry: any, rank: number = 1, forDay?: number) => {
+  const handleOpenShare = (entry: any, rank?: number, forDay?: number) => {
     if (!entry) return;
     const isOverall = !forDay && !entry.day && 'totalPoints' in entry;
+
+    // Resolve authoritative rank:
+    let resolvedRank = (typeof rank === 'number' && rank > 0) ? rank : 0;
+    if (resolvedRank === 0) {
+      const cleanRoll = (entry.rollNo || '').trim().toUpperCase();
+      const cleanName = (entry.fullName || entry.username || '').trim().toLowerCase();
+      if (isOverall) {
+        const idx = overallList.findIndex(e => {
+          const eRoll = (e.rollNo || '').trim().toUpperCase();
+          const eName = (e.fullName || e.username || '').trim().toLowerCase();
+          return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || (cleanName && eName === cleanName);
+        });
+        resolvedRank = idx >= 0 ? idx + 1 : 1;
+      } else {
+        const targetDay = forDay || entry.day || selectedDay || 1;
+        const targetList = targetDay === selectedDay ? dailyList : getLeaderboardEntries(targetDay);
+        const idx = targetList.findIndex(e => {
+          const eRoll = (e.rollNo || '').trim().toUpperCase();
+          const eName = (e.fullName || e.username || '').trim().toLowerCase();
+          return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || e.id === entry.id || (cleanName && eName === cleanName);
+        });
+        resolvedRank = idx >= 0 ? idx + 1 : 1;
+      }
+    }
+
     if (isOverall) {
       const maxPoints = overallMaxScore;
       const effectiveMax = entry.puzzleBonus && entry.puzzleBonus > 0 ? maxPoints + entry.puzzleBonus : maxPoints;
@@ -320,7 +345,7 @@ function Leaderboard() {
         timeTaken,
         firstTryCount,
         totalQuestions,
-        rank,
+        rank: resolvedRank,
         fullName: entry.fullName || entry.username || 'Explorer',
         course: entry.course || 'BCA',
         year: entry.year || '1st Sem',
@@ -349,7 +374,7 @@ function Leaderboard() {
       timeTaken,
       firstTryCount,
       totalQuestions,
-      rank,
+      rank: resolvedRank,
       fullName: entry.fullName || entry.username || 'Explorer',
       course: entry.course || 'BCA',
       year: entry.year || '1st Sem',
@@ -459,9 +484,57 @@ function Leaderboard() {
 
   const userDayRank = useMemo(() => {
     if (!currentUserDayEntry) return 0;
-    const idx = dailyList.findIndex(e => e.id === currentUserDayEntry.id);
+    const cleanRoll = (currentUserDayEntry.rollNo || '').trim().toUpperCase();
+    const cleanName = (currentUserDayEntry.fullName || currentUserDayEntry.username || '').trim().toLowerCase();
+    const idx = dailyList.findIndex(e => {
+      const eRoll = (e.rollNo || '').trim().toUpperCase();
+      const eName = (e.fullName || e.username || '').trim().toLowerCase();
+      return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || e.id === currentUserDayEntry.id || (cleanName && eName === cleanName);
+    });
     return idx >= 0 ? idx + 1 : 0;
   }, [dailyList, currentUserDayEntry]);
+
+  const currentUserOverallEntry = useMemo(() => {
+    const profile = getSavedUserProfile();
+    if (!profile) return null;
+    const cleanRoll = (profile.rollNo || '').trim().toUpperCase();
+    const cleanName = (profile.fullName || profile.username || '').trim().toLowerCase();
+    if (!cleanRoll && !cleanName) return null;
+    return (
+      overallList.find(e => {
+        const eRoll = (e.rollNo || '').trim().toUpperCase();
+        const eName = (e.fullName || e.username || '').trim().toLowerCase();
+        return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || (cleanName && eName === cleanName);
+      }) || null
+    );
+  }, [overallList]);
+
+  const userOverallRank = useMemo(() => {
+    if (!currentUserOverallEntry) return 0;
+    const cleanRoll = (currentUserOverallEntry.rollNo || '').trim().toUpperCase();
+    const cleanName = (currentUserOverallEntry.fullName || currentUserOverallEntry.username || '').trim().toLowerCase();
+    const idx = overallList.findIndex(e => {
+      const eRoll = (e.rollNo || '').trim().toUpperCase();
+      const eName = (e.fullName || e.username || '').trim().toLowerCase();
+      return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || (cleanName && eName === cleanName);
+    });
+    return idx >= 0 ? idx + 1 : 0;
+  }, [overallList, currentUserOverallEntry]);
+
+  // Dynamic rank for whichever user is clicked in the profile modal
+  const selectedUserRank = useMemo(() => {
+    if (!selectedUserDetail) return 1;
+    const isOverall = ('totalPoints' in selectedUserDetail) && !('day' in selectedUserDetail);
+    const targetList = isOverall ? overallList : dailyList;
+    const cleanRoll = (selectedUserDetail.rollNo || '').trim().toUpperCase();
+    const cleanName = (selectedUserDetail.fullName || selectedUserDetail.username || '').trim().toLowerCase();
+    const idx = targetList.findIndex(e => {
+      const eRoll = (e.rollNo || '').trim().toUpperCase();
+      const eName = (e.fullName || e.username || '').trim().toLowerCase();
+      return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || (cleanName && eName === cleanName);
+    });
+    return idx >= 0 ? idx + 1 : 1;
+  }, [selectedUserDetail, overallList, dailyList]);
 
   const currentDayUserBest = useMemo(() => {
     if (currentUserDayEntry) {
@@ -575,6 +648,37 @@ function Leaderboard() {
               />
             </div>
           </div>
+
+          {/* User Overall Tournament Standing Band */}
+          {currentUserOverallEntry && (
+            <div className="quiz-best-band flex items-center justify-between flex-wrap gap-2 max-w-4xl mx-auto">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Trophy size={16} className="text-amber-600 inline" />
+                <span className="font-bold">Your Overall Standing:</span>
+                <span className="font-black text-primary px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-xs sm:text-sm">
+                  {currentUserOverallEntry.totalPoints}/{overallMaxScore}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono font-bold flex items-center gap-1.5 ml-1">
+                  • ⚡ {currentUserOverallEntry.totalTimeSeconds}s
+                  {userOverallRank > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-foreground font-sans">
+                      Rank #{userOverallRank}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenShare(currentUserOverallEntry, userOverallRank || 1);
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-[var(--butter)] hover:bg-amber-200 text-foreground border border-amber-300 dark:border-amber-800 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+              >
+                <Share2 size={12} className="text-primary shrink-0" />
+                <span>Share My Overall Scorecard</span>
+              </button>
+            </div>
+          )}
 
           {/* 3-STEP PODIUM (Rank 1 Center, Rank 2 Left, Rank 3 Right) */}
           {filteredOverall.length >= 3 && !searchQuery && (
@@ -765,7 +869,14 @@ function Leaderboard() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredOverall.map((entry, idx) => {
-                    const rank = idx + 1;
+                    const cleanRoll = (entry.rollNo || '').trim().toUpperCase();
+                    const cleanName = (entry.fullName || entry.username || '').trim().toLowerCase();
+                    const foundIdx = overallList.findIndex(e => {
+                      const eRoll = (e.rollNo || '').trim().toUpperCase();
+                      const eName = (e.fullName || e.username || '').trim().toLowerCase();
+                      return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || (cleanName && eName === cleanName);
+                    });
+                    const rank = foundIdx >= 0 ? foundIdx + 1 : idx + 1;
                     return (
                       <tr
                         key={entry.username}
@@ -1022,7 +1133,14 @@ function Leaderboard() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredDaily.map((entry, idx) => {
-                    const rank = idx + 1;
+                    const cleanRoll = (entry.rollNo || '').trim().toUpperCase();
+                    const cleanName = (entry.fullName || entry.username || '').trim().toLowerCase();
+                    const foundIdx = dailyList.findIndex(e => {
+                      const eRoll = (e.rollNo || '').trim().toUpperCase();
+                      const eName = (e.fullName || e.username || '').trim().toLowerCase();
+                      return (cleanRoll && eRoll !== '-' && eRoll === cleanRoll) || e.id === entry.id || (cleanName && eName === cleanName);
+                    });
+                    const rank = foundIdx >= 0 ? foundIdx + 1 : idx + 1;
                     return (
                       <tr
                         key={entry.id}
@@ -1207,19 +1325,31 @@ function Leaderboard() {
               </div>
             </div>
 
-            {/* Score & Speed Prominent Badges */}
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl">
-                <span className="text-[11px] text-primary uppercase block font-black">Total Score</span>
-                <strong className="text-2xl font-black text-primary">
+            {/* Score, Rank & Speed Prominent Badges */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex flex-col justify-center">
+                <span className="text-[10px] sm:text-[11px] text-amber-700 dark:text-amber-400 uppercase block font-black">
+                  Rank
+                </span>
+                <strong className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-300">
+                  #{selectedUserRank}
+                </strong>
+              </div>
+              <div className="p-3 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col justify-center">
+                <span className="text-[10px] sm:text-[11px] text-primary uppercase block font-black">
+                  Total Score
+                </span>
+                <strong className="text-xl sm:text-2xl font-black text-primary">
                   {'totalPoints' in selectedUserDetail
                     ? `${selectedUserDetail.totalPoints}/${overallMaxScore}`
                     : `${selectedUserDetail.points}/${(selectedUserDetail as any).day === 10 ? 100 : 30}`}
                 </strong>
               </div>
-              <div className="p-3.5 bg-secondary border border-secondary-foreground/20 rounded-2xl">
-                <span className="text-[11px] text-secondary-foreground uppercase block font-black">Speed Record</span>
-                <strong className="text-2xl font-black text-secondary-foreground font-mono">
+              <div className="p-3 bg-secondary border border-secondary-foreground/20 rounded-2xl flex flex-col justify-center">
+                <span className="text-[10px] sm:text-[11px] text-secondary-foreground uppercase block font-black">
+                  Speed Record
+                </span>
+                <strong className="text-xl sm:text-2xl font-black text-secondary-foreground font-mono">
                   {'totalTimeSeconds' in selectedUserDetail ? selectedUserDetail.totalTimeSeconds : selectedUserDetail.timeSeconds}s
                 </strong>
               </div>
@@ -1230,7 +1360,7 @@ function Leaderboard() {
               <Button
                 className="w-full font-black h-11 text-xs sm:text-sm rounded-xl gap-2 bg-[var(--butter)] text-[var(--foreground)] hover:bg-[#fff0a6] border-2 border-[var(--foreground)] shadow-[3px_3px_0_var(--foreground)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
                 onClick={() => {
-                  handleOpenShare(selectedUserDetail, 1);
+                  handleOpenShare(selectedUserDetail, selectedUserRank);
                 }}
               >
                 <Share2 size={16} className="text-primary stroke-[2.5]" />

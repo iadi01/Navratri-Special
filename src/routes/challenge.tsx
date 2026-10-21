@@ -42,6 +42,7 @@ import {
   saveQuizProgress,
   clearQuizProgress,
   readLeaderboardFromStorage,
+  getLeaderboardEntries,
   type UserProfile,
   type UserAnswerRecord,
 } from '@/lib/leaderboard-store';
@@ -145,6 +146,25 @@ function Quiz() {
   // Submission result state
   const [submissionResult, setSubmissionResult] = useState<{ submitted: boolean; rank?: number; autoSaved?: boolean; streakBonus?: number } | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  // Authoritative day rank lookup: prioritize submissionResult.rank, fallback to leaderboard list position
+  const computedDayRank = useMemo(() => {
+    if (submissionResult?.rank && submissionResult.rank > 0) {
+      return submissionResult.rank;
+    }
+    const entries = getLeaderboardEntries(targetDay);
+    const profile = userProfile || getSavedUserProfile();
+    const cleanRoll = (profile?.rollNo || rollNo || '').trim().toUpperCase();
+    const cleanName = (profile?.fullName || profile?.username || playerName || '').trim().toLowerCase();
+    if (cleanRoll || cleanName) {
+      const idx = entries.findIndex(e =>
+        (cleanRoll && e.rollNo && e.rollNo.trim().toUpperCase() === cleanRoll) ||
+        (cleanName && (e.fullName?.trim().toLowerCase() === cleanName || e.username?.trim().toLowerCase() === cleanName))
+      );
+      if (idx >= 0) return idx + 1;
+    }
+    return 1;
+  }, [submissionResult, targetDay, userProfile, rollNo, playerName]);
 
   useEffect(() => {
     return () => {
@@ -844,7 +864,7 @@ function Quiz() {
                 timeTaken={timeTaken}
                 firstTryCount={Math.min(firstTryCount, questions.length)}
                 totalQuestions={questions.length}
-                rank={submissionResult?.rank || 1}
+                rank={computedDayRank}
                 fullName={userProfile?.fullName || playerName}
                 course={userProfile?.course || course}
                 year={userProfile?.year || year}
@@ -934,7 +954,7 @@ function Quiz() {
               timeTaken={timeTaken}
               firstTryCount={Math.min(firstTryCount, questions.length)}
               totalQuestions={questions.length}
-              rank={submissionResult?.rank || 1}
+              rank={computedDayRank}
               fullName={userProfile?.fullName || playerName}
               course={userProfile?.course || course}
               year={userProfile?.year || year}
